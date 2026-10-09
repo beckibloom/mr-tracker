@@ -163,7 +163,8 @@ app.get('/api/board', (_req, res) => {
     syncing,
     pollWindowActive: withinPollWindow(),
     projectAbbr: PROJECT_ABBR,
-    epicKey: process.env.MRT_EPIC_KEY ?? '',
+    epicKey: process.env.FOCUSED_EPIC_KEY ?? '',
+    epicLabel: process.env.FOCUSED_EPIC_LABEL || 'FOCUS',
   });
 });
 

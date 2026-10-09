@@ -374,7 +374,7 @@ const LinkChips = ({ card, entry, signals, onPickSuggestion }) => {
 const Card = ({ card, onClearOverride, onSaveNote }) => {
   const [editingNote, setEditingNote] = useState(false);
   const [linking, setLinking] = useState(null);
-  const { linkIndex, litSet, onHover, epicKey } = useContext(BoardContext);
+  const { linkIndex, litSet, onHover, epicKey, epicLabel } = useContext(BoardContext);
   const entry = linkIndex.get(card.key);
   const signals = cardSignals(card, entry);
   const save = (note) => onSaveNote(card.key, note);
@@ -396,7 +396,11 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
       onMouseEnter={() => onHover(card.key)}
       onMouseLeave={() => onHover(null)}
     >
-      {card.epic && <span className="epic-badge">{epicKey}</span>}
+      {card.epic && (
+        <span className="epic-badge" title={epicKey}>
+          {epicLabel}
+        </span>
+      )}
       <div className="card-head">
         <span
           className={`pipeline-dot pipeline-dot--${card.pipeline.color}`}

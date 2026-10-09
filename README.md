@@ -85,8 +85,8 @@ waiting on Sam's review                    your note
 - **Tools** (right of the header, bright on hover): the megaphone copies a Slack-ready
   review request (`:merge-request: <title> <url>`, title prefixes stripped), the chain
   link links to another MR, `+` adds a note. Notes are one line, click to edit, × to clear.
-- MRs in the configured epic get a purple border and a badge with the epic key (see
-  `MRT_EPIC_KEY`).
+- MRs in the epic you're most focused on get a purple border and a `FOCUS` badge (see
+  `FOCUSED_EPIC_KEY`; `FOCUSED_EPIC_LABEL` changes the badge text).
 
 ## Dependencies between MRs
 
@@ -162,7 +162,7 @@ The rest:
 | `MRT_PROJECT_ABBR`                                            | initials             | Short project names on link chips, e.g. `my-frontend=FE,design-system=DS`.                             |
 | `JIRA_BASE_URL`                                               | —                    | Enables Jira links on cards.                                                                           |
 | `JIRA_EMAIL`, `JIRA_API_TOKEN`                                | —                    | Adds worklog writes, ticket summaries and live epic membership.                                        |
-| `MRT_EPIC_KEY`, `MRT_EPIC_BRANCH_PATTERNS`, `MRT_EPIC_LABELS` | —                    | Highlight MRs in one epic: by Jira parent (needs credentials), branch regex, or labels. Empty disables. |
+| `FOCUSED_EPIC_KEY`, `FOCUSED_EPIC_LABEL`, `FOCUSED_EPIC_BRANCH_PATTERNS`, `FOCUSED_EPIC_LABELS` | — | Highlight the epic you're most focused on: members by Jira parent (needs credentials), branch regex, or labels. The label is the badge text (default `FOCUS`). An empty key disables it. |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 
@@ -180,8 +180,9 @@ differs (no AI reviewers, say), change the order there.
 ## Forking and contributing
 
 Fork it and make it whatever you want; that's the expected path if your workflow differs
-from mine. If you'd like a change in this copy, open an issue or a pull request. I'm the
-code owner (`CODEOWNERS`), so every change to `main` needs my approval before it can merge.
-Small, focused PRs with a sentence on which part of the workflow they help are the easiest
-to say yes to. [CONTRIBUTING.md](CONTRIBUTING.md) has the steps, the guardrails, and a map
+from mine. If you build something that fits the workflow here, please open a pull request so
+others can use it too. You don't have to, and I'm grateful to anyone who does. I'm the code
+owner (`CODEOWNERS`), so every PR to `main` needs my approval before it merges; small,
+focused PRs with a sentence on which part of the workflow they help are the quickest for
+me to review. [CONTRIBUTING.md](CONTRIBUTING.md) has the steps, the guardrails, and a map
 of the code.

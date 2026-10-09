@@ -8,12 +8,13 @@ and the right one depends on what you want.
 If your workflow differs from the one in the README (different review bots, no Jira, no
 AI reviewers, other columns), fork the project and change whatever you like. Forks don't
 need my review and don't owe anything back. If you later build something others would
-want, open an issue here and link your fork so I can point people at it.
+want, an issue here linking your fork would be welcome, so I can point people at it.
 
 ## Contribute back
 
-If the change fits the workflow in the README and helps more than one person, I'd like
-it in this copy. Here is how a change gets in.
+If you make a change that fits the workflow in the README, please open a pull request to
+include it in this copy so others can use it too. You're not obliged to, and I'm grateful
+to anyone who does. Here is how a change gets in.
 
 ### 1. Open an issue first for anything beyond a small fix
 

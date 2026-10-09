@@ -132,8 +132,8 @@ import { extractJiraKeys, getEpicMembers, jiraUrl, resolveEpicByJira } from './j
 
 // Branch-name shapes used by Epic wave work, for MRs that carry no ticket key.
 // Branch-name patterns that mark an MR as part of the epic; empty disables.
-const EPIC_BRANCH_RE = process.env.MRT_EPIC_BRANCH_PATTERNS
-  ? new RegExp(process.env.MRT_EPIC_BRANCH_PATTERNS, 'i')
+const EPIC_BRANCH_RE = process.env.FOCUSED_EPIC_BRANCH_PATTERNS
+  ? new RegExp(process.env.FOCUSED_EPIC_BRANCH_PATTERNS, 'i')
   : /(?!)/;
 
 /** Second-pass Epic detection through the Jira graph for cards the direct

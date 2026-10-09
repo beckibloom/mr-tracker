@@ -130,6 +130,7 @@ const App = () => {
     allCards: cards,
     cardByKey: new Map(cards.map((c) => [c.key, c])),
     epicKey: board.epicKey,
+    epicLabel: board.epicLabel,
     linkIndex,
     litSet,
     onHover: setHoverKey,

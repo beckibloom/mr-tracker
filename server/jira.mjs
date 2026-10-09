@@ -2,7 +2,7 @@
 const JIRA_BASE = (process.env.JIRA_BASE_URL ?? '').replace(/\/$/, '');
 const JIRA_EMAIL = process.env.JIRA_EMAIL ?? '';
 const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN ?? '';
-const EPIC_KEY = process.env.MRT_EPIC_KEY ?? '';
+const EPIC_KEY = process.env.FOCUSED_EPIC_KEY ?? '';
 const MEMBERS_TTL_MS = 60 * 60 * 1000;
 
 
@@ -81,7 +81,7 @@ export async function addWorklog(key, minutes, date) {
 }
 
 const EPIC_LABELS = new Set(
-  (process.env.MRT_EPIC_LABELS ?? '')
+  (process.env.FOCUSED_EPIC_LABELS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
