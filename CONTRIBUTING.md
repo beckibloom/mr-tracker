@@ -16,20 +16,13 @@ If you make a change that fits the workflow in the README, please open a pull re
 include it in this copy so others can use it too. You're not obliged to, and I'm grateful
 to anyone who does. Here is how a change gets in.
 
-### 1. Open an issue first for anything beyond a small fix
+### 1. Branch
 
-A sentence or two on which step of the workflow the change helps, and what you plan to
-do, saves both of us a rewritten pull request. Typos, broken styles, and one-line bug
-fixes can go straight to a PR.
+Fork, branch, and open the pull request against `main` here. Branch names are kebab-case with a short scope, e.g. `chains-tab-collapse`.
+Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`); nothing
+enforces it, but the history reads better.
 
-### 2. Branch from a fork
-
-Fork, branch, and open the pull request against `main` here. Branch names are kebab-case
-with a short scope, e.g. `chains-tab-collapse`. Commit messages follow Conventional
-Commits (`feat:`, `fix:`, `docs:`, `chore:`); nothing enforces it, but the history reads
-better.
-
-### 3. Run it while you work
+### 2. Run it while you work
 
 ```bash
 nvm install && npm install
@@ -37,27 +30,27 @@ cp .env.example .env    # fill in GITLAB_TOKEN (and GITLAB_BASE_URL if self-host
 npm run dev             # server :4178 + Vite :5180
 ```
 
-There is no test suite. Before you open the PR:
+There is no test suite. Before you open the pull request:
 
 - `npm run build` passes.
 - You've used the change in the browser against your real MRs, in both light and dark
   theme (the moon/sun button).
 - Nothing personal is committed: `.env` and `data/state.json` are git-ignored; keep it
-  that way, and don't add your own token, epic key, bot names or project names as code
-  defaults. Those belong in `.env`.
+  that way, and don't add your own token, epic key, bot names or project names as code defaults.
+  Those belong in `.env`.
 
-### 4. Open the PR
+### 3. Open the pull request
 
 Describe the change in terms of the workflow: which column, chip or tab it affects and
 why. Add a screenshot for anything visual. If you added a setting, document it in both
 `README.md` ("Make it yours") and `.env.example`, with a default that keeps the board
 working for someone who sets only `GITLAB_TOKEN`.
 
-### 5. Review and merge
+### 4. Review and merge
 
-I'm the code owner, so every change to `main` needs my approval before it can merge.
-Approvals reset when you push new commits, so push fixes before asking for re-review
-rather than after.
+I'm the code owner, so every change to `main` needs my approval before the Merge button
+enables. Approvals reset when you push new commits, so push fixes before asking for
+re-review rather than after. Once approved, I merge it.
 
 ## Guardrails
 
@@ -67,7 +60,7 @@ These are the lines I won't move in this copy; a fork is the place to cross them
   nothing to GitLab. The only writes anywhere are Jira worklogs from the Time tab, and
   only after an explicit Confirm click. Keep any new write behind the same kind of step.
 - **Works with one variable.** `GITLAB_TOKEN` alone must give a working board. Jira, the
-  epic highlight and the Time tab stay optional.
+  focused epic and the Time tab stay optional.
 - **No accounts, no server state shared between people.** One user, one `state.json`.
 - **Nothing organisation-specific in code.** Hostnames, bot names, epic keys, labels and
   project abbreviations are all `.env` settings with neutral defaults.
