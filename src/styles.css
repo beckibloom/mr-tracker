@@ -28,6 +28,7 @@
   --gl-indigo-300: #8c8cd8;
   --gl-font: 'GitLab Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --gl-font-mono: 'GitLab Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --claude: #d97757;
 }
 
 /* Semantic theme variables */
@@ -415,13 +416,144 @@ body {
   flex: none;
   gap: 0.125rem;
   margin-left: auto;
+}
+
+.card-tool {
   opacity: 0.4;
   transition: opacity 0.12s;
 }
 
-.card:hover .card-tools,
-.card:focus-within .card-tools {
+.card:hover .card-tool,
+.card:focus-within .card-tool {
   opacity: 1;
+}
+
+/* A card with a Claude session keeps its icon lit in Claude's color;
+   it pulses while the background session is working. */
+.card-tool--claude,
+.card-tool--claude:hover {
+  opacity: 1;
+  color: var(--claude);
+}
+
+.card-tool--claude-busy {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.card-tool--claude-stopped,
+.card-tool--claude-gone {
+  opacity: 0.6;
+}
+
+.claude-prompt {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.375rem;
+  padding: 0.125rem 0.375rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--claude);
+  border-radius: 4px;
+  outline: none;
+}
+
+/* Sessions view */
+.sessions {
+  flex: 1;
+  overflow-y: auto;
+  margin: 1.25rem;
+  padding: 0.5rem 0;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sessions-empty {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.session-row:last-child {
+  border-bottom: none;
+}
+
+.session-row:hover {
+  background: var(--btn-hover);
+}
+
+.session-time {
+  flex: none;
+  width: 3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.session-project {
+  flex: none;
+  width: 11rem;
+  font-family: var(--gl-font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-status {
+  flex: none;
+  font-size: 0.6875rem;
+  border-radius: 10px;
+  padding: 0.0625rem 0.5rem;
+  background: var(--count-bg);
+  color: var(--count-text);
+}
+
+.session-status--busy {
+  background: var(--claude);
+  color: #fff;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.session-status--idle {
+  background: var(--gl-green-100);
+  color: var(--gl-green-500);
+}
+
+.session-mr {
+  flex: none;
+  font-family: var(--gl-font-mono);
+  font-size: 0.6875rem;
+  color: var(--claude);
 }
 
 .card-tool {

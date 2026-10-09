@@ -75,10 +75,12 @@ These are the lines I won't move in this copy; a fork is the place to cross them
 | `server/gitlab.mjs`              | GitLab API calls; turns MRs into cards (pipeline health, AI review, human threads, mentions)    |
 | `server/classify.mjs`            | Column list and the classification order                                                       |
 | `server/jira.mjs`                | Jira links, epic membership, worklog writes                                                    |
+| `server/claude.mjs`              | Launch, focus and list Claude Code sessions in Terminal.app                                    |
 | `server/time-signals.mjs`        | Time tab signals: local git, Claude Code sessions, GitLab events                               |
 | `server/store.mjs`               | Load/save `data/state.json`                                                                    |
 | `src/App.jsx`                    | Board state, API calls, view switch, `BoardContext` provider                                    |
 | `src/components/Card.jsx`        | The card: header, chips, link chips and picker, suggestions, note                              |
 | `src/components/ChainsPanel.jsx` | The Chains tab                                                                                 |
+| `src/components/SessionsPanel.jsx`| The Sessions tab                                                                               |
 | `src/links.js`                   | Pure helpers: link index, chains, "your turn" signals, chain layering, project abbreviations   |
 | `src/styles.css`                 | All styles; theme tokens at the top                                                            |

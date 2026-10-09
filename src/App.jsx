@@ -4,6 +4,7 @@ import { BoardContext } from './board-context.js';
 import ChainsPanel from './components/ChainsPanel.jsx';
 import Column from './components/Column.jsx';
 import MergedTray from './components/MergedTray.jsx';
+import SessionsPanel from './components/SessionsPanel.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
 import { buildChains, buildLinkIndex, setProjectAbbr } from './links.js';
@@ -91,6 +92,25 @@ const App = () => {
     await load();
   };
 
+  const launchClaude = async (key, prompt) => {
+    const res = await fetch('/api/claude/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, prompt }),
+    });
+    if (!res.ok) window.alert((await res.json()).error ?? 'Could not start Claude.');
+    await load();
+  };
+
+  const openClaude = async (sessionId) => {
+    const res = await fetch('/api/claude/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    });
+    if (!res.ok) window.alert((await res.json()).error ?? 'Could not open the session.');
+  };
+
   const addTodo = async (text) => {
     await fetch('/api/todos', {
       method: 'POST',
@@ -137,6 +157,8 @@ const App = () => {
     onAddLink: addLink,
     onRemoveLink: removeLink,
     onDismissSuggestion: dismissSuggestion,
+    onLaunchClaude: launchClaude,
+    onOpenClaude: openClaude,
   };
 
   const SORTS = {
@@ -174,6 +196,12 @@ const App = () => {
               onClick={() => setView('chains')}
             >
               Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
+            </button>
+            <button
+              className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
+              onClick={() => setView('sessions')}
+            >
+              Sessions
             </button>
           </nav>
         </div>
@@ -230,6 +258,7 @@ const App = () => {
       )}
       {view === 'time' && <TimePanel />}
       {view === 'chains' && <ChainsPanel cards={cards} index={linkIndex} chains={chains} />}
+      {view === 'sessions' && <SessionsPanel onOpen={openClaude} />}
     </div>
     </BoardContext.Provider>
   );

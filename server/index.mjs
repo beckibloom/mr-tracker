@@ -1,9 +1,18 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  invalidateSessionCache,
+  launchSession,
+  listSessions,
+  openSession,
+  projectDir,
+  sessionStatus,
+} from './claude.mjs';
 import { classify, COLUMNS } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
 import { addWorklog, hasJiraWrite } from './jira.mjs';
@@ -27,6 +36,7 @@ state.todos ??= [];
 state.notes ??= {};
 state.links ??= [];
 state.dismissed ??= {};
+state.claudeSessions ??= {};
 const LINK_TYPES = new Set(['blocked-by', 'follows']);
 let syncing = false;
 
@@ -55,6 +65,9 @@ async function sync() {
       if (!cards[key]) delete state.notes[key];
     }
     state.links = state.links.filter((l) => cards[l.from] && cards[l.to]);
+    for (const key of Object.keys(state.claudeSessions)) {
+      if (!cards[key]) delete state.claudeSessions[key];
+    }
     for (const pair of Object.keys(state.dismissed)) {
       if (!pair.split('|').every((k) => cards[k])) delete state.dismissed[pair];
     }
@@ -152,6 +165,7 @@ app.get('/api/board', (_req, res) => {
     overridden: Boolean(state.overrides[card.key]),
     note: state.notes[card.key] ?? '',
     suggestions: suggestionsFor(card),
+    claudeSession: withStatus(state.claudeSessions[card.key]),
   }));
   res.json({
     columns: COLUMNS,
@@ -210,6 +224,118 @@ app.post('/api/links', (req, res) => {
   state.links.push(link);
   saveState(state);
   res.json(link);
+});
+
+const withStatus = (s) => (s ? { ...s, status: sessionStatus(s.sessionId) } : null);
+
+const refOf = (card) => `${card.project.split('/').pop()}!${card.iid}`;
+
+/** Everything the card shows, as Markdown for the first Claude message. */
+function cardBrief(card, userPrompt) {
+  const lines = [
+    `# ${card.title}`,
+    '',
+    `- MR: ${card.webUrl} (${refOf(card)})`,
+    `- Project: ${card.project}`,
+    `- State: ${card.state}${card.draft ? ', draft' : ''}; board column: ${state.overrides[card.key]?.column ?? card.autoColumn}`,
+    `- Pipeline: ${card.pipeline.status}`,
+  ];
+  if (card.jiraKey) lines.push(`- Jira: ${card.jiraKey}${card.jiraUrl ? ` (${card.jiraUrl})` : ''}`);
+  if (card.agentReview?.reviewed) {
+    lines.push(
+      `- AI review: ${card.agentReview.clean ? 'clean' : `${card.agentReview.issueCount ?? '?'} open issue(s)`}` +
+        (card.agentReview.verdict ? `, verdict ${card.agentReview.verdict}` : ''),
+    );
+  } else if (card.state !== 'merged') {
+    lines.push('- AI review: none yet');
+  }
+  if (card.approvalsMet) lines.push('- Approvals: met');
+  if (card.unresolvedHumanThreads > 0) {
+    lines.push(`- Unresolved human feedback threads: ${card.unresolvedHumanThreads}`);
+  }
+  const rel = [];
+  for (const l of state.links) {
+    const other = state.cards[l.from === card.key ? l.to : l.from];
+    if (!other || (l.from !== card.key && l.to !== card.key)) continue;
+    const verb =
+      l.from === card.key
+        ? l.type === 'blocked-by' ? 'blocked by' : 'follows'
+        : l.type === 'blocked-by' ? 'blocks' : 'followed by';
+    rel.push(`  - ${verb} ${refOf(other)} (${other.state}): ${other.title} — ${other.webUrl}`);
+  }
+  if (rel.length) lines.push('- Related MRs:', ...rel);
+  const note = state.notes[card.key];
+  if (note) lines.push(`- My note on the card: ${note}`);
+  lines.push('', '## Request', '', userPrompt.trim());
+  return lines.join('\n');
+}
+
+app.post('/api/claude/launch', (req, res) => {
+  const { key } = req.body ?? {};
+  const prompt = String(req.body?.prompt ?? '').trim();
+  const card = state.cards[key];
+  if (!card) return res.status(404).json({ error: `Unknown card ${key}` });
+  if (!prompt) return res.status(400).json({ error: 'A prompt is required.' });
+  const cwd = projectDir(card.project);
+  let sessionId;
+  try {
+    sessionId = launchSession({ cwd, prompt: cardBrief(card, prompt) });
+  } catch (err) {
+    return res.status(500).json({ error: `Could not start Claude: ${err.message}` });
+  }
+  const session = { sessionId, cwd, prompt, startedAt: new Date().toISOString() };
+  state.claudeSessions[key] = session;
+  invalidateSessionCache();
+  saveState(state);
+  res.json(withStatus(session));
+});
+
+app.post('/api/claude/open', (req, res) => {
+  const { sessionId } = req.body ?? {};
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId ?? '')) {
+    return res.status(400).json({ error: 'A session id is required.' });
+  }
+  const known = Object.values(state.claudeSessions).find((s) => s.sessionId === sessionId);
+  const cwd =
+    known?.cwd ?? listSessions().find((s) => s.sessionId === sessionId)?.cwd ?? homedir();
+  try {
+    res.json({ ok: true, result: openSession({ sessionId, cwd }) });
+  } catch (err) {
+    res.status(500).json({ error: `Could not open Terminal: ${err.message}` });
+  }
+});
+
+app.get('/api/claude/sessions', (_req, res) => {
+  const byId = new Map(
+    Object.entries(state.claudeSessions).map(([key, s]) => [s.sessionId, { key, s }]),
+  );
+  // Board-launched sessions open with the card brief; show the person's prompt instead.
+  const rows = listSessions().map((s) => {
+    const known = byId.get(s.sessionId);
+    return {
+      ...s,
+      mrKey: known?.key ?? null,
+      title: known?.s.prompt ?? s.title,
+      status: sessionStatus(s.sessionId),
+    };
+  });
+  // A just-launched background session has no transcript yet; list it anyway.
+  const listed = new Set(rows.map((r) => r.sessionId));
+  for (const [key, s] of Object.entries(state.claudeSessions)) {
+    if (listed.has(s.sessionId)) continue;
+    rows.push({
+      sessionId: s.sessionId,
+      cwd: s.cwd,
+      project: s.cwd.split('/').pop(),
+      title: s.prompt,
+      lastActive: s.startedAt,
+      bytes: 0,
+      mrKey: key,
+      status: sessionStatus(s.sessionId),
+    });
+  }
+  rows.sort((a, b) => (a.lastActive < b.lastActive ? 1 : -1));
+  res.json(rows);
 });
 
 app.post('/api/suggestions/dismiss', (req, res) => {

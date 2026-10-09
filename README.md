@@ -109,6 +109,30 @@ reverse forms **blocks** and **is followed by**, then search for the other MR.
 - The **Chains** tab lays each linked group out left to right by dependency, marking every
   node `now`, `blocked`, `waiting` or `merged`.
 
+## Claude sessions
+
+The Claude tool on a card (the asterisk icon) opens a one-line prompt. Press Enter and a
+Claude Code session starts **in the background** (`claude --bg`) in that project's local
+checkout (`MRT_DEV_ROOT/<project-name>`), with everything on the card as its first
+message: title, MR link, state and column, pipeline, Jira ticket, AI-review status, open
+feedback threads, dependency links, your note, and then your prompt. No window opens and
+nothing takes focus.
+
+The icon turns Claude-orange and pulses while Claude is working, then goes solid when it
+has finished or is waiting on you (a permission prompt, say). Click it to open the session
+in a Terminal tab (`claude attach`), read the result, and carry on interactively. Closing
+the tab doesn't stop the session; `claude stop <id>` does. ⌥-click starts a fresh session
+for the card.
+
+The **Sessions** tab lists every Claude Code session on this machine, newest activity
+first, with its project, first prompt (your typed prompt and the MR ref for board-launched
+ones) and a busy/idle badge for background jobs. Clicking a row opens it in Terminal the
+same way: attach if it's a background job, resume otherwise.
+
+Requirements: macOS (Terminal.app is driven through AppleScript), and the checkout must be
+a workspace Claude already trusts (run `claude` there once). The first click asks you to
+allow the app running the server to control Terminal.
+
 ## Time view
 
 The **Time** tab builds a daily worklog proposal from local signals:

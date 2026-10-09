@@ -143,6 +143,59 @@ const CopyReviewRequest = ({ card }) => {
   );
 };
 
+const CLAUDE_STATUS_TEXT = {
+  busy: 'Claude is working on this in the background',
+  idle: 'Claude has finished and is waiting for you',
+  stopped: 'Claude session stopped',
+  gone: 'Claude session',
+};
+
+const ClaudeIcon = () => (
+  <svg
+    width="11"
+    height="11"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.6"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
+  </svg>
+);
+
+// One-line prompt for a new Claude Code session about this MR.
+const ClaudePrompt = ({ onLaunch, onDone }) => {
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!draft.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onLaunch(draft.trim());
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <input
+      className="claude-prompt"
+      {...stopDrag}
+      autoFocus
+      disabled={busy}
+      placeholder={busy ? 'Starting Claude in the background…' : 'Ask Claude about this MR… (Enter to start)'}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') submit();
+        if (e.key === 'Escape') onDone();
+      }}
+    />
+  );
+};
+
 const LinkIcon = () => (
   <svg
     width="11"
@@ -374,7 +427,10 @@ const LinkChips = ({ card, entry, signals, onPickSuggestion }) => {
 const Card = ({ card, onClearOverride, onSaveNote }) => {
   const [editingNote, setEditingNote] = useState(false);
   const [linking, setLinking] = useState(null);
-  const { linkIndex, litSet, onHover, epicKey, epicLabel } = useContext(BoardContext);
+  const [prompting, setPrompting] = useState(false);
+  const { linkIndex, litSet, onHover, epicKey, epicLabel, onLaunchClaude, onOpenClaude } =
+    useContext(BoardContext);
+  const session = card.claudeSession;
   const entry = linkIndex.get(card.key);
   const signals = cardSignals(card, entry);
   const save = (note) => onSaveNote(card.key, note);
@@ -388,7 +444,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
   return (
     <article
       className={classes.join(' ')}
-      draggable={!editingNote && !linking}
+      draggable={!editingNote && !linking && !prompting}
       onDragStart={(e) => {
         onHover(null);
         e.dataTransfer.setData('text/mr-key', card.key);
@@ -422,6 +478,22 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         )}
         <span className="card-tools">
           {card.state !== 'merged' && <CopyReviewRequest card={card} />}
+          <button
+            className={`card-tool${session ? ` card-tool--claude card-tool--claude-${session.status}` : ''}`}
+            {...stopDrag}
+            onClick={(e) => {
+              if (session && !e.altKey) onOpenClaude(session.sessionId);
+              else setPrompting(true);
+            }}
+            title={
+              session
+                ? `${CLAUDE_STATUS_TEXT[session.status] ?? 'Claude session'} · started ${relTime(session.startedAt)} ago. Click to open in Terminal; ⌥-click for a new session.`
+                : 'Ask Claude about this MR (runs in the background)'
+            }
+            aria-label={session ? 'Open Claude session' : 'Ask Claude about this MR'}
+          >
+            <ClaudeIcon />
+          </button>
           {!linking && (
             <button
               className="card-tool"
@@ -480,6 +552,12 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
       <LinkChips card={card} entry={entry} signals={signals} onPickSuggestion={setLinking} />
       {linking && (
         <LinkPicker card={card} initial={linking} onDone={() => setLinking(null)} />
+      )}
+      {prompting && (
+        <ClaudePrompt
+          onLaunch={(prompt) => onLaunchClaude(card.key, prompt)}
+          onDone={() => setPrompting(false)}
+        />
       )}
       {editingNote ? (
         <NoteEditor initial={card.note} onSave={save} onDone={() => setEditingNote(false)} />
