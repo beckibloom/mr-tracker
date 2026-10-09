@@ -186,12 +186,6 @@ const App = () => {
               Board
             </button>
             <button
-              className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('time')}
-            >
-              Time
-            </button>
-            <button
               className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
               onClick={() => setView('chains')}
             >
@@ -202,6 +196,12 @@ const App = () => {
               onClick={() => setView('sessions')}
             >
               Sessions
+            </button>
+            <button
+              className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
+              onClick={() => setView('time')}
+            >
+              Time
             </button>
           </nav>
         </div>
