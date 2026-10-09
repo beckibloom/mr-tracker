@@ -279,7 +279,11 @@ app.post('/api/claude/launch', (req, res) => {
   const cwd = projectDir(card.project);
   let sessionId;
   try {
-    sessionId = launchSession({ cwd, prompt: cardBrief(card, prompt) });
+    sessionId = launchSession({
+      cwd,
+      prompt: cardBrief(card, prompt),
+      name: `${refOf(card)} · ${prompt.slice(0, 60)}`,
+    });
   } catch (err) {
     return res.status(500).json({ error: `Could not start Claude: ${err.message}` });
   }

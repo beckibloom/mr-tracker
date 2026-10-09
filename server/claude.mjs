@@ -8,6 +8,9 @@ const CLAUDE_PROJECTS = join(homedir(), '.claude', 'projects');
 const LIST_TTL_MS = 10 * 1000;
 const AGENTS_TTL_MS = 10 * 1000;
 const HEAD_BYTES = 64 * 1024;
+// Extra flags for every board-launched session, e.g. "--model fable --permission-mode auto".
+// Sessions otherwise inherit ~/.claude/settings.json (model, permissions.defaultMode, effort).
+const CLAUDE_ARGS = (process.env.MRT_CLAUDE_ARGS ?? '').split(/\s+/).filter(Boolean);
 
 /** Local checkout for an MR's project: ~/dev/<project-name> when it exists. */
 export function projectDir(projectPath) {
@@ -53,8 +56,9 @@ export function sessionStatus(sessionId) {
 }
 
 /** Start a background Claude Code session in `cwd` with `prompt` as its first message. */
-export function launchSession({ cwd, prompt }) {
-  const out = execFileSync('claude', ['--bg', prompt], { cwd, encoding: 'utf8', timeout: 60000 });
+export function launchSession({ cwd, prompt, name }) {
+  const args = ['--bg', ...CLAUDE_ARGS, ...(name ? ['--name', name] : []), prompt];
+  const out = execFileSync('claude', args, { cwd, encoding: 'utf8', timeout: 60000 });
   // "backgrounded · f6e7e527" — a prefix of the full session id.
   const prefix = out.match(/backgrounded\s*·\s*([0-9a-f]+)/)?.[1];
   if (!prefix) throw new Error(out.trim().split('\n').pop() || 'claude --bg returned no session id');

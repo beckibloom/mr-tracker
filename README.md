@@ -129,6 +129,11 @@ first, with its project, first prompt (your typed prompt and the MR ref for boar
 ones) and a busy/idle badge for background jobs. Clicking a row opens it in Terminal the
 same way: attach if it's a background job, resume otherwise.
 
+Sessions use the model, permission mode and effort from your `~/.claude/settings.json`;
+`MRT_CLAUDE_ARGS` adds flags on top (for example `--model fable --permission-mode auto`).
+Each session is named after the MR ref and your prompt, which is what `claude agents` and
+the attach view show.
+
 Requirements: macOS (Terminal.app is driven through AppleScript), and the checkout must be
 a workspace Claude already trusts (run `claude` there once). The first click asks you to
 allow the app running the server to control Terminal.
@@ -187,6 +192,7 @@ The rest:
 | `JIRA_BASE_URL`                                               | —                    | Enables Jira links on cards.                                                                           |
 | `JIRA_EMAIL`, `JIRA_API_TOKEN`                                | —                    | Adds worklog writes, ticket summaries and live epic membership.                                        |
 | `FOCUSED_EPIC_KEY`, `FOCUSED_EPIC_LABEL`, `FOCUSED_EPIC_BRANCH_PATTERNS`, `FOCUSED_EPIC_LABELS` | — | Highlight the epic you're most focused on: members by Jira parent (needs credentials), branch regex, or labels. The label is the badge text (default `FOCUS`). An empty key disables it. |
+| `MRT_CLAUDE_ARGS` | — | Extra `claude` flags for sessions started from a card, e.g. `--model fable --permission-mode auto`. Otherwise sessions use your `~/.claude/settings.json` defaults. |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 
