@@ -51,8 +51,9 @@ export function sessionStatus(sessionId) {
   const job = agents().find((a) => a.sessionId === sessionId);
   if (!job) return 'gone';
   if (job.status === 'busy' || job.status === 'idle') return job.status;
-  // A job that is still starting has a pid but no status yet.
-  return job.pid ? 'busy' : 'stopped';
+  // A job that is still starting may have no status (or pid) for a moment.
+  const starting = job.pid || Date.now() - (job.startedAt ?? 0) < 60 * 1000;
+  return starting ? 'busy' : 'stopped';
 }
 
 /** Start a background Claude Code session in `cwd` with `prompt` as its first message. */
