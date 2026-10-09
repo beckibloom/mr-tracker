@@ -181,7 +181,7 @@ differs (no AI reviewers, say), change the order there.
 
 Fork it and make it whatever you want; that's the expected path if your workflow differs
 from mine. If you build something that fits the workflow here, please open a pull request so
-others can use it too. You don't have to, and I'm grateful to anyone who does. I'm the code
+others can use it too. I'm grateful for anyone who wants to collaborate! I'm the code
 owner (`CODEOWNERS`), so every PR to `main` needs my approval before it merges; small,
 focused PRs with a sentence on which part of the workflow they help are the quickest for
 me to review. [CONTRIBUTING.md](CONTRIBUTING.md) has the steps, the guardrails, and a map

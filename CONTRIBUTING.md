@@ -13,8 +13,8 @@ want, an issue here linking your fork would be welcome, so I can point people at
 ## Contribute back
 
 If you make a change that fits the workflow in the README, please open a pull request to
-include it in this copy so others can use it too. You're not obliged to, and I'm grateful
-to anyone who does. Here is how a change gets in.
+include it in this copy so others can use it too. I'm grateful for anyone who wants to
+collaborate! Here is how a change gets in.
 
 ### 1. Branch
 
