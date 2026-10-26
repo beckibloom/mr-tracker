@@ -404,6 +404,23 @@ body {
 .chip--good { background: var(--gl-green-100); color: var(--gl-green-500); }
 .chip--warn { background: var(--gl-orange-100); color: var(--gl-orange-500); }
 .chip--muted { background: var(--count-bg); color: var(--count-text); }
+/* Conflicts block everything else, so this chip is the loudest thing on a card */
+.chip--conflict {
+  background: var(--gl-red-500);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chip--conflict:hover {
+  text-decoration: underline;
+}
+
+:root[data-theme='dark'] .chip--conflict {
+  background: var(--gl-red-300);
+  color: var(--gl-gray-950);
+}
+
 .chip--override {
   background: var(--gl-blue-50);
   color: var(--gl-blue-500);

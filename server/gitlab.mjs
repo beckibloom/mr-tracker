@@ -231,6 +231,7 @@ export async function fetchOpenCards() {
           required > 0
             ? approvals.approvals_left === 0
             : (approvals.approved_by?.length ?? 0) > 0,
+        hasConflicts: Boolean(detail.has_conflicts),
         inMergeTrain: Boolean(
           detail.merge_when_pipeline_succeeds || detail.auto_merge_enabled,
         ),

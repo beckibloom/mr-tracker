@@ -531,6 +531,18 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         {card.title.replace(/^Draft:\s*/, '')}
       </a>
       <div className="card-chips">
+        {card.hasConflicts && (
+          <a
+            className="chip chip--conflict"
+            href={card.webUrl}
+            target="_blank"
+            rel="noreferrer"
+            title="This branch has merge conflicts with its target. Open the MR to resolve them."
+            {...stopDrag}
+          >
+            ⚠ merge conflicts
+          </a>
+        )}
         {!card.postMerge && agentChip(card.agentReview, card.column)}
         {card.approvalsMet && !APPROVED_IMPLIED.has(card.column) && (
           <span className="chip chip--good">approved</span>

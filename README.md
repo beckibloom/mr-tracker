@@ -79,7 +79,8 @@ waiting on Sam's review                    your note
   cancelled, pulsing blue running, grey none.
 - **Ref** copies `project!iid` to the clipboard. The **Jira icon** opens the ticket found in
   the title or branch (needs `JIRA_BASE_URL`).
-- **Chips** show only what the column doesn't already say: `feedback · N` for unresolved
+- **Chips** show only what the column doesn't already say: a red `⚠ merge conflicts` chip
+  whenever the branch conflicts with its target (click it to open the MR), `feedback · N` for unresolved
   threads from humans, AI issue counts, `approved` outside the Approved column,
   `auto-merge` while approvals are outstanding, and `manual ×` for an override.
 - **Tools** (right of the header, bright on hover): the megaphone copies a Slack-ready
