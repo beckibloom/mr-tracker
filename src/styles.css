@@ -478,6 +478,102 @@ body {
 }
 
 /* Sessions view */
+.sessions-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.launch {
+  flex: none;
+  margin: 1.25rem 1.25rem 0;
+  padding: 0.5rem 0;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.launch--empty {
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.launch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.375rem 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.launch-row:last-child {
+  border-bottom: none;
+}
+
+.launch-label {
+  flex: none;
+  width: 14rem;
+  font-weight: 600;
+}
+
+.launch-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.launch-input:focus {
+  outline: none;
+  border-color: var(--claude);
+}
+
+.launch-input--none {
+  visibility: hidden;
+}
+
+.launch-start {
+  flex: none;
+  border-color: var(--claude);
+}
+
+.launch-start:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.claude-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.claude-preset {
+  padding: 0.0625rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  color: var(--claude);
+  background: var(--surface);
+  border: 1px solid var(--claude);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.claude-preset:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
 .sessions {
   flex: 1;
   overflow-y: auto;

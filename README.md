@@ -130,6 +130,25 @@ first, with its project, first prompt (your typed prompt and the MR ref for boar
 ones) and a busy/idle badge for background jobs. Clicking a row opens it in Terminal the
 same way: attach if it's a background job, resume otherwise.
 
+**Quick actions** sit above the session list: one row per saved prompt, each with a **Start**
+button that launches the session and opens it in Terminal. A row whose prompt needs input gets
+a text box, or an MR picker that searches your open cards. Picking a card's MR starts the
+session in that MR's checkout with the card brief, like the card's own Claude button. The same
+MR actions appear as one-click chips under a card's Claude prompt. Define the actions in a JSON
+file (`MRT_LAUNCHER_FILE`, default `~/.mr-tracker/launcher.json`); `{input}` in a prompt is
+replaced with what you typed or picked:
+
+```json
+[
+  { "id": "next", "label": "What's next on my board", "prompt": "What should I work on next?", "input": "none" },
+  { "id": "review", "label": "Address review", "prompt": "Address the latest review findings on {input}", "input": "mr" },
+  { "id": "new", "label": "Start new work", "prompt": "Plan this: {input}", "input": "text", "placeholder": "Describe the idea" }
+]
+```
+
+`input` is `none`, `text` or `mr`; `cwd` (optional, `~` allowed) sets where the session starts,
+falling back to `MRT_LAUNCHER_CWD`, then your home directory.
+
 Sessions use the model, permission mode and effort from your `~/.claude/settings.json`;
 `MRT_CLAUDE_ARGS` adds flags on top (for example `--model fable --permission-mode auto`).
 Each session is named after the MR ref and your prompt, which is what `claude agents` and
@@ -194,6 +213,8 @@ The rest:
 | `JIRA_EMAIL`, `JIRA_API_TOKEN`                                | —                    | Adds worklog writes, ticket summaries and live epic membership.                                        |
 | `FOCUSED_EPIC_KEY`, `FOCUSED_EPIC_LABEL`, `FOCUSED_EPIC_BRANCH_PATTERNS`, `FOCUSED_EPIC_LABELS` | — | Highlight the epic you're most focused on: members by Jira parent (needs credentials), branch regex, or labels. The label is the badge text (default `FOCUS`). An empty key disables it. |
 | `MRT_CLAUDE_ARGS` | — | Extra `claude` flags for sessions started from a card, e.g. `--model fable --permission-mode auto`. Otherwise sessions use your `~/.claude/settings.json` defaults. |
+| `MRT_LAUNCHER_FILE` | `~/.mr-tracker/launcher.json` | Quick actions for the Sessions tab and card chips (see Claude sessions). |
+| `MRT_LAUNCHER_CWD` | home directory | Where quick actions start when they set no `cwd` and no MR was picked. |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 

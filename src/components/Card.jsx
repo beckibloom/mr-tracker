@@ -165,21 +165,23 @@ const ClaudeIcon = () => (
   </svg>
 );
 
-// One-line prompt for a new Claude Code session about this MR.
-const ClaudePrompt = ({ onLaunch, onDone }) => {
+// One-line prompt for a new Claude Code session about this MR, plus one-click quick actions.
+const ClaudePrompt = ({ onLaunch, onDone, presets = [], onPreset }) => {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const submit = async () => {
-    if (!draft.trim() || busy) return;
+  const run = async (fn) => {
+    if (busy) return;
     setBusy(true);
     try {
-      await onLaunch(draft.trim());
+      await fn();
       onDone();
     } finally {
       setBusy(false);
     }
   };
+  const submit = () => draft.trim() && run(() => onLaunch(draft.trim()));
   return (
+    <>
     <input
       className="claude-prompt"
       {...stopDrag}
@@ -193,6 +195,23 @@ const ClaudePrompt = ({ onLaunch, onDone }) => {
         if (e.key === 'Escape') onDone();
       }}
     />
+    {presets.length > 0 && (
+      <div className="claude-presets" {...stopDrag}>
+        {presets.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className="claude-preset"
+            disabled={busy}
+            title={p.prompt}
+            onClick={() => run(() => onPreset(p.id))}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   );
 };
 
@@ -428,8 +447,17 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
   const [editingNote, setEditingNote] = useState(false);
   const [linking, setLinking] = useState(null);
   const [prompting, setPrompting] = useState(false);
-  const { linkIndex, litSet, onHover, epicKey, epicLabel, onLaunchClaude, onOpenClaude } =
-    useContext(BoardContext);
+  const {
+    linkIndex,
+    litSet,
+    onHover,
+    epicKey,
+    epicLabel,
+    onLaunchClaude,
+    onOpenClaude,
+    launcherActions = [],
+    onLaunchAction,
+  } = useContext(BoardContext);
   const session = card.claudeSession;
   const entry = linkIndex.get(card.key);
   const signals = cardSignals(card, entry);
@@ -569,6 +597,8 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         <ClaudePrompt
           onLaunch={(prompt) => onLaunchClaude(card.key, prompt)}
           onDone={() => setPrompting(false)}
+          presets={launcherActions.filter((a) => a.input === 'mr')}
+          onPreset={(id) => onLaunchAction(id, `${card.project.split('/').pop()}!${card.iid}`)}
         />
       )}
       {editingNote ? (

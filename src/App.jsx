@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BoardContext } from './board-context.js';
 import ChainsPanel from './components/ChainsPanel.jsx';
 import Column from './components/Column.jsx';
+import LaunchPanel from './components/LaunchPanel.jsx';
 import MergedTray from './components/MergedTray.jsx';
 import SessionsPanel from './components/SessionsPanel.jsx';
 import TimePanel from './components/TimePanel.jsx';
@@ -18,6 +19,14 @@ const App = () => {
   const [view, setView] = useState('board');
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort') ?? 'epic');
   const [hoverKey, setHoverKey] = useState(null);
+  const [launcherActions, setLauncherActions] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/launcher')
+      .then((res) => res.json())
+      .then(setLauncherActions)
+      .catch(() => setLauncherActions([]));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('mrt-sort', sortBy);
@@ -102,6 +111,21 @@ const App = () => {
     await load();
   };
 
+  // Returns true when the session started, so the caller can clear its input.
+  const launchAction = async (id, input) => {
+    const res = await fetch('/api/launcher/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, input }),
+    });
+    if (!res.ok) {
+      window.alert((await res.json()).error ?? 'Could not start Claude.');
+      return false;
+    }
+    await load();
+    return true;
+  };
+
   const openClaude = async (sessionId) => {
     const res = await fetch('/api/claude/open', {
       method: 'POST',
@@ -159,6 +183,8 @@ const App = () => {
     onDismissSuggestion: dismissSuggestion,
     onLaunchClaude: launchClaude,
     onOpenClaude: openClaude,
+    launcherActions,
+    onLaunchAction: launchAction,
   };
 
   const SORTS = {
@@ -258,7 +284,12 @@ const App = () => {
       )}
       {view === 'time' && <TimePanel />}
       {view === 'chains' && <ChainsPanel cards={cards} index={linkIndex} chains={chains} />}
-      {view === 'sessions' && <SessionsPanel onOpen={openClaude} />}
+      {view === 'sessions' && (
+        <div className="sessions-view">
+          <LaunchPanel />
+          <SessionsPanel onOpen={openClaude} />
+        </div>
+      )}
     </div>
     </BoardContext.Provider>
   );

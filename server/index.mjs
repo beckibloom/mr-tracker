@@ -16,6 +16,7 @@ import {
 import { classify, COLUMNS } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
 import { addWorklog, hasJiraWrite } from './jira.mjs';
+import { buildPrompt, loadActions } from './launcher.mjs';
 import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
@@ -37,6 +38,7 @@ state.notes ??= {};
 state.links ??= [];
 state.dismissed ??= {};
 state.claudeSessions ??= {};
+state.launcherSessions ??= [];
 const LINK_TYPES = new Set(['blocked-by', 'follows']);
 let syncing = false;
 
@@ -294,12 +296,57 @@ app.post('/api/claude/launch', (req, res) => {
   res.json(withStatus(session));
 });
 
+app.get('/api/launcher', (_req, res) => {
+  res.json(loadActions());
+});
+
+// Start a quick action and show it in Terminal. An MR input that matches a card launches with the
+// card brief in that MR's checkout, like the card's own Claude button.
+app.post('/api/launcher/launch', (req, res) => {
+  const action = loadActions().find((a) => a.id === req.body?.id);
+  if (!action) return res.status(404).json({ error: `Unknown action ${req.body?.id}` });
+  const input = String(req.body?.input ?? '').trim();
+  if (action.input !== 'none' && !input) {
+    return res.status(400).json({ error: 'This action needs input.' });
+  }
+  const prompt = buildPrompt(action, input);
+  const card =
+    action.input === 'mr'
+      ? Object.values(state.cards).find((c) => refOf(c) === input || c.webUrl === input)
+      : null;
+  const cwd = card ? projectDir(card.project) : (action.cwd ?? process.env.MRT_LAUNCHER_CWD ?? homedir());
+  let sessionId;
+  try {
+    sessionId = launchSession({
+      cwd,
+      prompt: card ? cardBrief(card, prompt) : prompt,
+      name: `${action.label}${input ? ` · ${input.slice(0, 50)}` : ''}`,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: `Could not start Claude: ${err.message}` });
+  }
+  const session = { sessionId, cwd, prompt, startedAt: new Date().toISOString() };
+  if (card) state.claudeSessions[card.key] = session;
+  else state.launcherSessions = [session, ...state.launcherSessions].slice(0, 20);
+  invalidateSessionCache();
+  saveState(state);
+  let opened = null;
+  try {
+    opened = openSession({ sessionId, cwd });
+  } catch {
+    // Still running in the background; the Sessions list can open it.
+  }
+  res.json({ ...withStatus(session), opened });
+});
+
 app.post('/api/claude/open', (req, res) => {
   const { sessionId } = req.body ?? {};
   if (!/^[0-9a-f-]{36}$/i.test(sessionId ?? '')) {
     return res.status(400).json({ error: 'A session id is required.' });
   }
-  const known = Object.values(state.claudeSessions).find((s) => s.sessionId === sessionId);
+  const known = [...Object.values(state.claudeSessions), ...state.launcherSessions].find(
+    (s) => s.sessionId === sessionId,
+  );
   const cwd =
     known?.cwd ?? listSessions().find((s) => s.sessionId === sessionId)?.cwd ?? homedir();
   try {
@@ -335,6 +382,19 @@ app.get('/api/claude/sessions', (_req, res) => {
       lastActive: s.startedAt,
       bytes: 0,
       mrKey: key,
+      status: sessionStatus(s.sessionId),
+    });
+  }
+  for (const s of state.launcherSessions) {
+    if (listed.has(s.sessionId)) continue;
+    rows.push({
+      sessionId: s.sessionId,
+      cwd: s.cwd,
+      project: s.cwd.split('/').pop(),
+      title: s.prompt,
+      lastActive: s.startedAt,
+      bytes: 0,
+      mrKey: null,
       status: sessionStatus(s.sessionId),
     });
   }
