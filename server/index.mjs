@@ -1,4 +1,5 @@
 import express from 'express';
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -21,6 +22,10 @@ import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
 import { addWorklog, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
 import { record, report } from './usage.mjs';
+
+// MRT_LINK_BROWSER="Google Chrome" opens the board's links in that app (useful when the board runs
+// inside VS Code's browser); unset, links open wherever the page runs.
+const LINK_BROWSER = process.env.MRT_LINK_BROWSER ?? '';
 
 // MRT_HIDE=chains,time,todos  hides features without removing them (see README).
 const HIDDEN = (process.env.MRT_HIDE ?? '')
@@ -194,7 +199,23 @@ app.get('/api/board', (_req, res) => {
     epicKey: process.env.FOCUSED_EPIC_KEY ?? '',
     epicLabel: process.env.FOCUSED_EPIC_LABEL || 'FOCUS',
     hidden: HIDDEN,
+    linkBrowser: Boolean(LINK_BROWSER),
   });
+});
+
+app.post('/api/open-url', (req, res) => {
+  let url;
+  try {
+    url = new URL(String(req.body?.url ?? ''));
+  } catch {
+    return res.status(400).json({ error: 'Not a URL.' });
+  }
+  if (!LINK_BROWSER || !['http:', 'https:'].includes(url.protocol)) {
+    return res.status(400).json({ error: 'Link opening is off or the URL is not http(s).' });
+  }
+  execFile('open', ['-a', LINK_BROWSER, url.href], (err) =>
+    err ? res.status(500).json({ error: err.message }) : res.json({ ok: true }),
+  );
 });
 
 app.post('/api/usage', (req, res) => {

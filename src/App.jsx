@@ -41,6 +41,26 @@ const App = () => {
     localStorage.setItem('mrt-theme', theme);
   }, [theme]);
 
+  // With MRT_LINK_BROWSER set, http(s) links open in that browser via the server, so the board
+  // can run inside VS Code while MRs and tickets still open in the person's own browser.
+  useEffect(() => {
+    if (!board?.linkBrowser) return undefined;
+    const onClick = (e) => {
+      const a = e.target.closest?.('a[href]');
+      if (!a || e.defaultPrevented || e.button !== 0) return;
+      const url = new URL(a.href, window.location.href);
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin === window.location.origin) return;
+      e.preventDefault();
+      fetch('/api/open-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url.href }),
+      }).catch(() => window.open(url.href, '_blank'));
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [board?.linkBrowser]);
+
   const load = useCallback(async () => {
     const res = await fetch('/api/board');
     const data = await res.json();
