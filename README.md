@@ -89,6 +89,11 @@ waiting on Sam's review                    your note
 - MRs in the epic you're most focused on get a purple border and a `FOCUS` badge (see
   `FOCUSED_EPIC_KEY`; `FOCUSED_EPIC_LABEL` changes the badge text).
 
+**Find an MR**: the search box in the top bar (press `/` to focus it) highlights matching cards
+and dims the rest. Type an MR number (`905`), a project-qualified ref (`DS!905`,
+`camp-design-system!905`), or words from the title or Jira key. Enter jumps to the next match;
+Escape clears.
+
 ## Dependencies between MRs
 
 A link says one MR **is blocked by** another (must merge first) or **follows** it (should
