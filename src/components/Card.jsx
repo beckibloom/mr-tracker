@@ -509,8 +509,10 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           <button
             className={`card-tool${session ? ` card-tool--claude card-tool--claude-${session.status}` : ''}`}
             {...stopDrag}
+            aria-expanded={prompting}
             onClick={(e) => {
-              if (session && !e.altKey) onOpenClaude(session.sessionId);
+              if (prompting) setPrompting(false);
+              else if (session && !e.altKey) onOpenClaude(session.sessionId);
               else setPrompting(true);
             }}
             title={
