@@ -515,6 +515,28 @@ body {
   border-bottom: none;
 }
 
+.launch-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.375rem 1.25rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.launch-one {
+  border-color: var(--claude);
+  font-weight: 600;
+}
+
+.launch-one:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.launch-one:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .launch-label {
   flex: none;
   width: 14rem;

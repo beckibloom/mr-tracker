@@ -67,6 +67,29 @@ const Cheatsheet = () => {
   );
 };
 
+// An action with no input: the label is the button.
+const OneClick = ({ action, onStart }) => {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      className="btn launch-one"
+      title={action.prompt}
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await onStart(action.id, '');
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? 'Starting…' : action.label}
+    </button>
+  );
+};
+
 const LaunchPanel = () => {
   const { allCards, launcherActions, onLaunchAction } = useContext(BoardContext);
   if (!launcherActions?.length) {
@@ -88,9 +111,20 @@ const LaunchPanel = () => {
           </option>
         ))}
       </datalist>
-      {launcherActions.map((a) => (
-        <ActionRow key={a.id} action={a} onStart={onLaunchAction} />
-      ))}
+      {launcherActions.some((a) => a.input === 'none') && (
+        <div className="launch-buttons">
+          {launcherActions
+            .filter((a) => a.input === 'none')
+            .map((a) => (
+              <OneClick key={a.id} action={a} onStart={onLaunchAction} />
+            ))}
+        </div>
+      )}
+      {launcherActions
+        .filter((a) => a.input !== 'none')
+        .map((a) => (
+          <ActionRow key={a.id} action={a} onStart={onLaunchAction} />
+        ))}
       <Cheatsheet />
     </section>
   );
