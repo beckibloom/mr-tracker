@@ -119,7 +119,15 @@ end tell`);
 }
 
 // MRT_OPEN_IN=vscode opens sessions in a Claude Code tab in VS Code instead of Terminal.
-const OPEN_IN = process.env.MRT_OPEN_IN ?? 'terminal';
+export const OPEN_IN = process.env.MRT_OPEN_IN ?? 'terminal';
+
+/** Open a new VS Code Claude Code tab with `prompt` filled in; the person presses Enter. */
+export function openPromptInVSCode(prompt) {
+  execFileSync('open', [`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(prompt)}`]);
+}
+
+/** The part of a first prompt that a session's listed title keeps, for matching the two. */
+export const promptKey = (text) => String(text).trim().replace(/\s+/g, ' ').slice(0, 120);
 
 /** Show the session: a VS Code tab when configured, else Terminal (focus, attach, or resume). */
 export function openSession({ sessionId, cwd }) {

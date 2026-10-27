@@ -9,7 +9,10 @@ import {
   invalidateSessionCache,
   launchSession,
   listSessions,
+  OPEN_IN,
+  openPromptInVSCode,
   openSession,
+  promptKey,
   projectDir,
   sessionStatus,
 } from './claude.mjs';
@@ -46,6 +49,7 @@ state.links ??= [];
 state.dismissed ??= {};
 state.claudeSessions ??= {};
 state.launcherSessions ??= [];
+state.pendingLaunches ??= [];
 const LINK_TYPES = new Set(['blocked-by', 'follows']);
 let syncing = false;
 
@@ -168,6 +172,7 @@ const app = express();
 app.use(express.json());
 
 app.get('/api/board', (_req, res) => {
+  adoptPending();
   const cards = Object.values(state.cards).map((card) => ({
     ...card,
     column: state.overrides[card.key]?.column ?? card.autoColumn,
@@ -295,13 +300,14 @@ app.post('/api/claude/launch', (req, res) => {
   if (!card) return res.status(404).json({ error: `Unknown card ${key}` });
   if (!prompt) return res.status(400).json({ error: 'A prompt is required.' });
   const cwd = projectDir(card.project);
+  const brief = cardBrief(card, prompt);
+  if (OPEN_IN === 'vscode') {
+    const result = openPending({ key, cwd, brief, prompt });
+    return result.error ? res.status(500).json(result) : res.json(result);
+  }
   let sessionId;
   try {
-    sessionId = launchSession({
-      cwd,
-      prompt: cardBrief(card, prompt),
-      name: `${refOf(card)} · ${prompt.slice(0, 60)}`,
-    });
+    sessionId = launchSession({ cwd, prompt: brief, name: `${refOf(card)} · ${prompt.slice(0, 60)}` });
   } catch (err) {
     return res.status(500).json({ error: `Could not start Claude: ${err.message}` });
   }
@@ -312,6 +318,46 @@ app.post('/api/claude/launch', (req, res) => {
   res.json(withStatus(session));
 });
 
+// VS Code mode: open a tab with the prompt filled in. The session id exists only once the person
+// presses Enter, so remember the launch and adopt the session when its transcript appears.
+function openPending({ key = null, cwd, brief, prompt }) {
+  try {
+    openPromptInVSCode(brief);
+  } catch (err) {
+    return { error: `Could not open VS Code: ${err.message}` };
+  }
+  state.pendingLaunches.push({ key, cwd, prompt, match: promptKey(brief), startedAt: new Date().toISOString() });
+  saveState(state);
+  return { pending: true, opened: 'vscode' };
+}
+
+const PENDING_TTL_MS = 60 * 60 * 1000;
+
+function adoptPending() {
+  if (!state.pendingLaunches.length) return;
+  const now = Date.now();
+  let changed = false;
+  const sessions = listSessions();
+  state.pendingLaunches = state.pendingLaunches.filter((p) => {
+    const hit = sessions.find(
+      (s) => s.lastActive >= p.startedAt && s.title && promptKey(s.title).startsWith(p.match.slice(0, 100)),
+    );
+    if (hit) {
+      const session = { sessionId: hit.sessionId, cwd: hit.cwd ?? p.cwd, prompt: p.prompt, startedAt: p.startedAt };
+      if (p.key && state.cards[p.key]) state.claudeSessions[p.key] = session;
+      else state.launcherSessions = [session, ...state.launcherSessions].slice(0, 20);
+      changed = true;
+      return false;
+    }
+    if (now - new Date(p.startedAt).getTime() > PENDING_TTL_MS) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  if (changed) saveState(state);
+}
+
 app.get('/api/launcher', (_req, res) => {
   res.json(loadActions());
 });
@@ -320,7 +366,7 @@ app.get('/api/cheatsheet', (_req, res) => {
   res.json({ text: loadCheatsheet() });
 });
 
-// Start a quick action and show it in Terminal. An MR input that matches a card launches with the
+// Start a quick action and show it (Terminal, or a VS Code tab with MRT_OPEN_IN=vscode). An MR input that matches a card launches with the
 // card brief in that MR's checkout, like the card's own Claude button.
 app.post('/api/launcher/launch', (req, res) => {
   const action = loadActions().find((a) => a.id === req.body?.id);
@@ -335,6 +381,10 @@ app.post('/api/launcher/launch', (req, res) => {
       ? Object.values(state.cards).find((c) => refOf(c) === input || c.webUrl === input)
       : null;
   const cwd = card ? projectDir(card.project) : (action.cwd ?? process.env.MRT_LAUNCHER_CWD ?? homedir());
+  if (OPEN_IN === 'vscode') {
+    const result = openPending({ key: card?.key, cwd, brief: card ? cardBrief(card, prompt) : prompt, prompt });
+    return result.error ? res.status(500).json(result) : res.json(result);
+  }
   let sessionId;
   try {
     sessionId = launchSession({
@@ -377,6 +427,7 @@ app.post('/api/claude/open', (req, res) => {
 });
 
 app.get('/api/claude/sessions', (_req, res) => {
+  adoptPending();
   const byId = new Map(
     Object.entries(state.claudeSessions).map(([key, s]) => [s.sessionId, { key, s }]),
   );
