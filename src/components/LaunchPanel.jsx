@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import { BoardContext } from '../board-context.js';
 
@@ -48,6 +48,24 @@ const ActionRow = ({ action, onStart }) => {
   );
 };
 
+// The MRT_CHEATSHEET_FILE notes, collapsed under the actions.
+const Cheatsheet = () => {
+  const [text, setText] = useState(null);
+  useEffect(() => {
+    fetch('/api/cheatsheet')
+      .then((res) => res.json())
+      .then((data) => setText(data.text))
+      .catch(() => setText(null));
+  }, []);
+  if (!text) return null;
+  return (
+    <details className="launch-notes">
+      <summary>Cheat sheet and background jobs</summary>
+      <pre>{text}</pre>
+    </details>
+  );
+};
+
 const LaunchPanel = () => {
   const { allCards, launcherActions, onLaunchAction } = useContext(BoardContext);
   if (!launcherActions?.length) {
@@ -55,6 +73,7 @@ const LaunchPanel = () => {
       <section className="launch launch--empty">
         Add quick actions to <code>launcher.json</code> (see README, MRT_LAUNCHER_FILE) to start
         sessions from here.
+        <Cheatsheet />
       </section>
     );
   }
@@ -71,6 +90,7 @@ const LaunchPanel = () => {
       {launcherActions.map((a) => (
         <ActionRow key={a.id} action={a} onStart={onLaunchAction} />
       ))}
+      <Cheatsheet />
     </section>
   );
 };

@@ -22,3 +22,14 @@ export function loadActions() {
 }
 
 export const buildPrompt = (action, input) => action.prompt.replaceAll('{input}', input.trim());
+
+// Optional notes shown under the quick actions (MRT_CHEATSHEET_FILE), e.g. a personal cheat sheet.
+export function loadCheatsheet() {
+  const file = process.env.MRT_CHEATSHEET_FILE;
+  if (!file || !existsSync(expand(file))) return null;
+  try {
+    return readFileSync(expand(file), 'utf8');
+  } catch {
+    return null;
+  }
+}

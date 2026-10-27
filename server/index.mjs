@@ -16,7 +16,7 @@ import {
 import { classify, COLUMNS } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
 import { addWorklog, hasJiraWrite } from './jira.mjs';
-import { buildPrompt, loadActions } from './launcher.mjs';
+import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
 import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
@@ -298,6 +298,10 @@ app.post('/api/claude/launch', (req, res) => {
 
 app.get('/api/launcher', (_req, res) => {
   res.json(loadActions());
+});
+
+app.get('/api/cheatsheet', (_req, res) => {
+  res.json({ text: loadCheatsheet() });
 });
 
 // Start a quick action and show it in Terminal. An MR input that matches a card launches with the
