@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BoardContext } from './board-context.js';
 import ChainsPanel from './components/ChainsPanel.jsx';
@@ -24,6 +24,15 @@ const App = () => {
   const [hoverKey, setHoverKey] = useState(null);
   const [launcherActions, setLauncherActions] = useState([]);
   const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState(null);
+  const noticeTimer = useRef(null);
+  // A VS Code launch only fills in the prompt, so say where it went and what to do next.
+  const announce = (data) => {
+    if (data?.opened !== 'vscode') return;
+    setNotice('Your prompt is in a new Claude tab in VS Code. Press Enter there to start it.');
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 10000);
+  };
 
   useEffect(() => {
     fetch('/api/launcher')
@@ -137,7 +146,9 @@ const App = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, prompt }),
     });
-    if (!res.ok) window.alert((await res.json()).error ?? 'Could not start Claude.');
+    const data = await res.json();
+    if (!res.ok) window.alert(data.error ?? 'Could not start Claude.');
+    else announce(data);
     await load();
   };
 
@@ -149,10 +160,12 @@ const App = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, input }),
     });
+    const data = await res.json();
     if (!res.ok) {
-      window.alert((await res.json()).error ?? 'Could not start Claude.');
+      window.alert(data.error ?? 'Could not start Claude.');
       return false;
     }
+    announce(data);
     await load();
     return true;
   };
@@ -353,6 +366,11 @@ const App = () => {
         <div className="sessions-view">
           <LaunchPanel />
           <SessionsPanel onOpen={openClaude} />
+        </div>
+      )}
+      {notice && (
+        <div className="toast" role="status" onClick={() => setNotice(null)}>
+          {notice}
         </div>
       )}
     </div>

@@ -1594,3 +1594,20 @@ button.card-note-text {
   font-family: inherit;
   font-size: 0.875rem;
 }
+
+/* Short-lived status message, e.g. after opening a prefilled VS Code tab */
+.toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 100;
+  max-width: 24rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--claude);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
