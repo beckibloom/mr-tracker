@@ -118,11 +118,20 @@ end tell`);
   return out === 'found';
 }
 
-/** Show the session in Terminal: focus an existing tab, attach to a job, or resume. */
+// MRT_OPEN_IN=vscode opens sessions in a Claude Code tab in VS Code instead of Terminal.
+const OPEN_IN = process.env.MRT_OPEN_IN ?? 'terminal';
+
+/** Show the session: a VS Code tab when configured, else Terminal (focus, attach, or resume). */
 export function openSession({ sessionId, cwd }) {
-  if (focusTerminalTab(sessionId)) return 'focused';
   // `claude attach/logs/stop` take the job's short id, not the full session id.
   const job = agents(true).find((a) => a.sessionId === sessionId);
+  // A background job that is still running can only be attached from a terminal.
+  const runningJob = job?.kind === 'background' && ['busy', 'idle'].includes(sessionStatus(sessionId));
+  if (OPEN_IN === 'vscode' && !runningJob) {
+    execFileSync('open', [`vscode://anthropic.claude-code/open?session=${encodeURIComponent(sessionId)}`]);
+    return 'vscode';
+  }
+  if (focusTerminalTab(sessionId)) return 'focused';
   const command = job ? `claude attach ${job.id}` : `claude --resume ${sessionId}`;
   openTerminalTab(`cd ${shellQuote(cwd)} && ${command}`);
   return job ? 'attached' : 'resumed';

@@ -46,7 +46,7 @@ const SessionsPanel = ({ onOpen }) => {
             type="button"
             className="session-row"
             onClick={() => onOpen(s.sessionId)}
-            title={`Open in Terminal\n${s.cwd ?? ''}\n${s.sessionId}`}
+            title={`Open session\n${s.cwd ?? ''}\n${s.sessionId}`}
           >
             <span className="session-time" title={new Date(s.lastActive).toLocaleString()}>
               {relTime(s.lastActive)}

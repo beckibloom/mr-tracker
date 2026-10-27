@@ -216,6 +216,7 @@ The rest:
 | `MRT_LAUNCHER_FILE` | `~/.mr-tracker/launcher.json` | Quick actions for the Sessions tab and card chips (see Claude sessions). |
 | `MRT_LAUNCHER_CWD` | home directory | Where quick actions start when they set no `cwd` and no MR was picked. |
 | `MRT_CHEATSHEET_FILE` | — | A text or Markdown file shown, collapsed, under the quick actions (a personal cheat sheet, notes on background jobs). |
+| `MRT_OPEN_IN` | `terminal` | `vscode` opens sessions from the Sessions list and cards in a Claude Code tab in VS Code. A background job that is still running opens in Terminal, since only a terminal can attach to it. |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 

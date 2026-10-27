@@ -517,7 +517,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
             }}
             title={
               session
-                ? `${CLAUDE_STATUS_TEXT[session.status] ?? 'Claude session'} · started ${relTime(session.startedAt)} ago. Click to open in Terminal; ⌥-click for a new session.`
+                ? `${CLAUDE_STATUS_TEXT[session.status] ?? 'Claude session'} · started ${relTime(session.startedAt)} ago. Click to open it; ⌥-click for a new session.`
                 : 'Ask Claude about this MR (runs in the background)'
             }
             aria-label={session ? 'Open Claude session' : 'Ask Claude about this MR'}
