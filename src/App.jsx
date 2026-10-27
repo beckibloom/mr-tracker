@@ -212,16 +212,16 @@ const App = () => {
               Board
             </button>
             <button
-              className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('chains')}
-            >
-              Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
-            </button>
-            <button
               className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
               onClick={() => setView('sessions')}
             >
               Sessions
+            </button>
+            <button
+              className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
+              onClick={() => setView('chains')}
+            >
+              Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
             </button>
             <button
               className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}

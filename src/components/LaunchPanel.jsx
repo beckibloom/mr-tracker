@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 
 import { BoardContext } from '../board-context.js';
+import { Markdown } from '../markdown.jsx';
 
 const refOf = (card) => `${card.project.split('/').pop()}!${card.iid}`;
 
@@ -61,7 +62,7 @@ const Cheatsheet = () => {
   return (
     <details className="launch-notes">
       <summary>Cheat sheet and background jobs</summary>
-      <pre>{text}</pre>
+      <Markdown text={text} />
     </details>
   );
 };
