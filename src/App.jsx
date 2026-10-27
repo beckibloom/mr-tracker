@@ -181,7 +181,7 @@ const App = () => {
     [hoverKey, chains, chainOf],
   );
   const searchHits = useMemo(
-    () => matchCards(cards.filter((c) => c.column !== 'merged'), query),
+    () => matchCards(cards, query),
     [cards, query],
   );
   const searchSet = useMemo(() => (searchHits ? new Set(searchHits) : null), [searchHits]);
