@@ -450,6 +450,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
   const {
     linkIndex,
     litSet,
+    searchSet,
     onHover,
     epicKey,
     epicLabel,
@@ -467,10 +468,12 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
   if (card.epic) classes.push('card--epic');
   if (signals.status) classes.push(`card--${signals.status}`);
   if (signals.heat) classes.push(`card--heat-${signals.heat}`);
-  if (litSet) classes.push(litSet.has(card.key) ? 'card--lit' : 'card--dim');
+  if (searchSet) classes.push(searchSet.has(card.key) ? 'card--search-hit' : 'card--dim');
+  else if (litSet) classes.push(litSet.has(card.key) ? 'card--lit' : 'card--dim');
 
   return (
     <article
+      data-card-key={card.key}
       className={classes.join(' ')}
       draggable={!editingNote && !linking && !prompting}
       onDragStart={(e) => {

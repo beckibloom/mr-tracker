@@ -8,7 +8,9 @@ import MergedTray from './components/MergedTray.jsx';
 import SessionsPanel from './components/SessionsPanel.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
+import SearchBox from './components/SearchBox.jsx';
 import { buildChains, buildLinkIndex, setProjectAbbr } from './links.js';
+import { matchCards } from './search.js';
 
 const UI_REFRESH_MS = 60 * 1000;
 
@@ -20,6 +22,7 @@ const App = () => {
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort') ?? 'epic');
   const [hoverKey, setHoverKey] = useState(null);
   const [launcherActions, setLauncherActions] = useState([]);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     fetch('/api/launcher')
@@ -167,6 +170,11 @@ const App = () => {
     () => (hoverKey && chainOf.has(hoverKey) ? new Set(chains[chainOf.get(hoverKey)]) : null),
     [hoverKey, chains, chainOf],
   );
+  const searchHits = useMemo(
+    () => matchCards(cards.filter((c) => c.column !== 'merged'), query),
+    [cards, query],
+  );
+  const searchSet = useMemo(() => (searchHits ? new Set(searchHits) : null), [searchHits]);
 
   if (!board) return <div className="loading">Loading board…</div>;
 
@@ -177,6 +185,7 @@ const App = () => {
     epicLabel: board.epicLabel,
     linkIndex,
     litSet,
+    searchSet,
     onHover: setHoverKey,
     onAddLink: addLink,
     onRemoveLink: removeLink,
@@ -232,6 +241,7 @@ const App = () => {
           </nav>
         </div>
         <div className="topbar-right">
+          {view === 'board' && <SearchBox query={query} onChange={setQuery} hits={searchHits} />}
           {view === 'board' && (
             <label className="sort-control">
               Sort by
