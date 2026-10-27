@@ -4,3 +4,4 @@ data/state.json
 .env
 .DS_Store
 *.log
+data/usage.json

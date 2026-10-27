@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 
 import { BoardContext } from '../board-context.js';
 import { shortRef } from '../links.js';
+import { track } from '../track.js';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -45,7 +46,10 @@ const SessionsPanel = ({ onOpen }) => {
             key={s.sessionId}
             type="button"
             className="session-row"
-            onClick={() => onOpen(s.sessionId)}
+            onClick={() => {
+              track('session:open');
+              onOpen(s.sessionId);
+            }}
             title={`Open session\n${s.cwd ?? ''}\n${s.sessionId}`}
           >
             <span className="session-time" title={new Date(s.lastActive).toLocaleString()}>

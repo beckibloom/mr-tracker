@@ -2,6 +2,7 @@ import { useContext, useRef, useState } from 'react';
 
 import { BoardContext } from '../board-context.js';
 import { LINK_TYPES, cardSignals, followHeat, shortRef } from '../links.js';
+import { track } from '../track.js';
 import StateDot from './StateDot.jsx';
 
 const relTime = (iso) => {
@@ -125,6 +126,7 @@ const CopyReviewRequest = ({ card }) => {
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
   const copy = async () => {
+    track('card:copy-review-request');
     await navigator.clipboard.writeText(reviewRequestText(card));
     setCopied(true);
     clearTimeout(timer.current);
@@ -458,6 +460,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
     onOpenClaude,
     launcherActions = [],
     onLaunchAction,
+    hidden = new Set(),
   } = useContext(BoardContext);
   const session = card.claudeSession;
   const entry = linkIndex.get(card.key);
@@ -508,14 +511,20 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           </a>
         )}
         <span className="card-tools">
-          {card.state !== 'merged' && <CopyReviewRequest card={card} />}
+          {card.state !== 'merged' && !hidden.has('review-request') && (
+            <CopyReviewRequest card={card} />
+          )}
+          {!hidden.has('claude') && (
           <button
             className={`card-tool${session ? ` card-tool--claude card-tool--claude-${session.status}` : ''}`}
             {...stopDrag}
             aria-expanded={prompting}
             onClick={(e) => {
               if (prompting) setPrompting(false);
-              else if (session && !e.altKey) onOpenClaude(session.sessionId);
+              else if (session && !e.altKey) {
+                track('card:claude-open');
+                onOpenClaude(session.sessionId);
+              }
               else setPrompting(true);
             }}
             title={
@@ -527,7 +536,8 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           >
             <ClaudeIcon />
           </button>
-          {!linking && (
+          )}
+          {!linking && !hidden.has('links') && (
             <button
               className="card-tool"
               {...stopDrag}
@@ -538,7 +548,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
               <LinkIcon />
             </button>
           )}
-          {onSaveNote && !card.note && !editingNote && (
+          {onSaveNote && !card.note && !editingNote && !hidden.has('notes') && (
             <button
               className="card-tool"
               {...stopDrag}
@@ -560,6 +570,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         target="_blank"
         rel="noreferrer"
         title={card.title}
+        onClick={() => track('card:open-mr')}
       >
         {card.title.replace(/^Draft:\s*/, '')}
       </a>

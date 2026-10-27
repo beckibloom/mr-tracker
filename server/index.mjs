@@ -17,6 +17,13 @@ import { classify, COLUMNS } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
 import { addWorklog, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
+import { record, report } from './usage.mjs';
+
+// MRT_HIDE=chains,time,todos  hides features without removing them (see README).
+const HIDDEN = (process.env.MRT_HIDE ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
@@ -181,7 +188,16 @@ app.get('/api/board', (_req, res) => {
     projectAbbr: PROJECT_ABBR,
     epicKey: process.env.FOCUSED_EPIC_KEY ?? '',
     epicLabel: process.env.FOCUSED_EPIC_LABEL || 'FOCUS',
+    hidden: HIDDEN,
   });
+});
+
+app.post('/api/usage', (req, res) => {
+  res.json({ ok: record(String(req.body?.feature ?? '')) });
+});
+
+app.get('/api/usage', (_req, res) => {
+  res.json({ ...report(loadActions()), hidden: HIDDEN });
 });
 
 app.post('/api/refresh', async (_req, res) => {

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { track } from '../track.js';
+
 import Card from './Card.jsx';
 
 const MergedTray = ({ cards }) => {
@@ -7,7 +9,10 @@ const MergedTray = ({ cards }) => {
 
   return (
     <aside className={`merged-tray${open ? ' merged-tray--open' : ''}`}>
-      <button className="merged-toggle" onClick={() => setOpen((o) => !o)}>
+      <button className="merged-toggle" onClick={() => {
+          if (!open) track('tray:merged');
+          setOpen((o) => !o);
+        }}>
         Merged · last 7 days ({cards.length}) {open ? '▾' : '▸'}
       </button>
       {open && (

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { track } from '../track.js';
+
 const URL_RE = /(https?:\/\/[^\s)]+)/g;
 
 const linkify = (text) =>
@@ -27,7 +29,10 @@ const TodoTray = ({ todos, onAdd, onToggle, onDelete }) => {
 
   return (
     <aside className={`todo-tray${open ? ' todo-tray--open' : ''}`}>
-      <button className="merged-toggle" onClick={() => setOpen((o) => !o)}>
+      <button className="merged-toggle" onClick={() => {
+          if (!open) track('tray:todos');
+          setOpen((o) => !o);
+        }}>
         To-do ({openCount}) {open ? '▾' : '▸'}
       </button>
       {open && (

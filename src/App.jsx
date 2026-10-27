@@ -11,6 +11,7 @@ import TodoTray from './components/TodoTray.jsx';
 import SearchBox from './components/SearchBox.jsx';
 import { buildChains, buildLinkIndex, setProjectAbbr } from './links.js';
 import { matchCards } from './search.js';
+import { track } from './track.js';
 
 const UI_REFRESH_MS = 60 * 1000;
 
@@ -54,6 +55,7 @@ const App = () => {
   }, [load]);
 
   const refresh = async () => {
+    track('refresh');
     setRefreshing(true);
     try {
       await fetch('/api/refresh', { method: 'POST' });
@@ -64,6 +66,7 @@ const App = () => {
   };
 
   const moveCard = async (key, column) => {
+    track('card:drag');
     await fetch('/api/override', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,6 +76,7 @@ const App = () => {
   };
 
   const saveNote = async (key, note) => {
+    track('card:note');
     await fetch('/api/note', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,6 +86,7 @@ const App = () => {
   };
 
   const addLink = async (from, to, type) => {
+    track('card:link');
     await fetch('/api/links', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,6 +101,7 @@ const App = () => {
   };
 
   const dismissSuggestion = async (from, to) => {
+    track('card:dismiss-suggestion');
     await fetch('/api/suggestions/dismiss', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,6 +111,7 @@ const App = () => {
   };
 
   const launchClaude = async (key, prompt) => {
+    track('card:claude-prompt');
     const res = await fetch('/api/claude/launch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,6 +123,7 @@ const App = () => {
 
   // Returns true when the session started, so the caller can clear its input.
   const launchAction = async (id, input) => {
+    track(`launch:${id}`);
     const res = await fetch('/api/launcher/launch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -139,6 +147,7 @@ const App = () => {
   };
 
   const addTodo = async (text) => {
+    track('todo:add');
     await fetch('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -148,6 +157,7 @@ const App = () => {
   };
 
   const toggleTodo = async (id, done) => {
+    track('todo:toggle');
     await fetch(`/api/todos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -178,6 +188,16 @@ const App = () => {
 
   if (!board) return <div className="loading">Loading board…</div>;
 
+  const hidden = new Set(board.hidden ?? []);
+  const showView = (v) => {
+    track(`tab:${v}`);
+    setView(v);
+  };
+  const searchFor = (q) => {
+    if (!query && q) track('search');
+    setQuery(q);
+  };
+
   const boardCtx = {
     allCards: cards,
     cardByKey: new Map(cards.map((c) => [c.key, c])),
@@ -194,6 +214,7 @@ const App = () => {
     onOpenClaude: openClaude,
     launcherActions,
     onLaunchAction: launchAction,
+    hidden,
   };
 
   const SORTS = {
@@ -216,36 +237,45 @@ const App = () => {
           <nav className="view-switch">
             <button
               className={`view-btn${view === 'board' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('board')}
+              onClick={() => showView('board')}
             >
               Board
             </button>
-            <button
-              className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('sessions')}
-            >
-              Sessions
-            </button>
-            <button
-              className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('chains')}
-            >
-              Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
-            </button>
-            <button
-              className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('time')}
-            >
-              Time
-            </button>
+            {!hidden.has('sessions') && (
+              <button
+                className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('sessions')}
+              >
+                Sessions
+              </button>
+            )}
+            {!hidden.has('chains') && (
+              <button
+                className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('chains')}
+              >
+                Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
+              </button>
+            )}
+            {!hidden.has('time') && (
+              <button
+                className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('time')}
+              >
+                Time
+              </button>
+            )}
           </nav>
         </div>
         <div className="topbar-right">
-          {view === 'board' && <SearchBox query={query} onChange={setQuery} hits={searchHits} />}
-          {view === 'board' && (
+          {view === 'board' && !hidden.has('search') && <SearchBox query={query} onChange={searchFor} hits={searchHits} />}
+          {view === 'board' && !hidden.has('sort') && (
             <label className="sort-control">
               Sort by
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <select value={sortBy} onChange={(e) => {
+                  track('sort');
+                  setSortBy(e.target.value);
+                }}>
                 <option value="epic">Epic first</option>
                 <option value="oldest">Oldest first</option>
               </select>
@@ -263,7 +293,10 @@ const App = () => {
           </button>
           <button
             className="btn"
-            onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+            onClick={() => {
+              track('theme');
+              setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+            }}
             title="Toggle light/dark mode"
           >
             {theme === 'light' ? '🌙' : '☀️'}
@@ -283,13 +316,15 @@ const App = () => {
               />
             ))}
           </main>
-          <TodoTray
-            todos={board.todos ?? []}
-            onAdd={addTodo}
-            onToggle={toggleTodo}
-            onDelete={deleteTodo}
-          />
-          <MergedTray cards={merged} />
+          {!hidden.has('todos') && (
+            <TodoTray
+              todos={board.todos ?? []}
+              onAdd={addTodo}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+            />
+          )}
+          {!hidden.has('merged') && <MergedTray cards={merged} />}
         </>
       )}
       {view === 'time' && <TimePanel />}

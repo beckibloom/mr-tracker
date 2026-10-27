@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 
 import { BoardContext } from '../board-context.js';
 import { Markdown } from '../markdown.jsx';
+import { track } from '../track.js';
 
 const refOf = (card) => `${card.project.split('/').pop()}!${card.iid}`;
 
@@ -60,7 +61,7 @@ const Cheatsheet = () => {
   }, []);
   if (!text) return null;
   return (
-    <details className="launch-notes">
+    <details className="launch-notes" onToggle={(e) => e.currentTarget.open && track('cheatsheet')}>
       <summary>Cheat sheet and background jobs</summary>
       <Markdown text={text} />
     </details>

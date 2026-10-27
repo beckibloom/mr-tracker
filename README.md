@@ -177,6 +177,17 @@ Enter total hours, hit **Distribute** (15-minute rounding), adjust, then **Log t
 Confirm**. Nothing is written without the confirm step, and no comment body is attached.
 Writing needs `JIRA_EMAIL` + `JIRA_API_TOKEN`.
 
+## Feature usage and hiding
+
+The tracker counts how often you use each feature (tabs, search, sort, card tools, trays, quick
+actions, the cheat sheet) in `data/usage.json`, which never leaves your machine.
+`GET /api/usage` lists every feature, least used first, with its count and last use, so you can
+spot what you never touch.
+
+Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
+`sessions`, `chains`, `time` (tabs), `search`, `sort`, `todos`, `merged` (trays), and the card
+tools `review-request`, `claude`, `links`, `notes`.
+
 ## Setup
 
 You need Node 22.9 or newer (`nvm install` reads `.nvmrc`) and a GitLab personal access
@@ -222,6 +233,7 @@ The rest:
 | `MRT_LAUNCHER_CWD` | home directory | Where quick actions start when they set no `cwd` and no MR was picked. |
 | `MRT_CHEATSHEET_FILE` | — | A text or Markdown file shown, collapsed, under the quick actions (a personal cheat sheet, notes on background jobs). |
 | `MRT_OPEN_IN` | `terminal` | `vscode` opens sessions from the Sessions list and cards in a Claude Code tab in VS Code. A background job that is still running opens in Terminal, since only a terminal can attach to it. |
+| `MRT_HIDE` | — | Comma-separated features to hide, e.g. `chains,time,todos` (see Feature usage and hiding). |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 
