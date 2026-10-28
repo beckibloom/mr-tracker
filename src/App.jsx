@@ -256,6 +256,7 @@ const App = () => {
       (b.epic ? 1 : 0) - (a.epic ? 1 : 0) || new Date(b.updatedAt) - new Date(a.updatedAt),
     // Oldest MRs (by creation date) float to the top.
     oldest: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   };
   const sortCards = SORTS[sortBy] ?? SORTS.epic;
   const active = board.cards.filter((c) => c.column !== 'merged').sort(sortCards);
@@ -310,6 +311,7 @@ const App = () => {
                   setSortBy(e.target.value);
                 }}>
                 <option value="epic">Epic first</option>
+                <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
               </select>
             </label>
