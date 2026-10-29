@@ -50,8 +50,11 @@ Cards are classified on each sync, in this order:
 | Draft                  | MR is marked draft                                                                |
 | Approved               | All approval requirements met (unresolved threads don't block this)               |
 | Waiting for approval   | Reviewers assigned (non-bot), or auto-merge set but not yet approved; or dragged  |
-| Ready to share         | Latest AI review has zero issues + recommends approve, and pipeline is passing    |
+| Ready to share         | Latest AI review clean + approve, pipeline passing, no conflicts, no open blockers|
 | Agent iteration        | Everything else: no AI review yet, or the review raised any issue                 |
+
+A blocker is an unmerged MR the card waits on: a board `blocked by` link or a GitLab
+"Merge request dependency". GitLab-only dependencies show as `⛓ blocked by` chips.
 
 Drag a card to any column to override the classification. The override sticks until the
 MR's GitLab state would classify it differently, then clears itself. Click the `manual ×`

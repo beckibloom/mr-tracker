@@ -214,10 +214,11 @@ export async function fetchOpenCards() {
   const cards = await Promise.all(
     open.map(async (mr) => {
       const pid = mr.project_id;
-      const [detail, approvals, discussions] = await Promise.all([
+      const [detail, approvals, discussions, blocks] = await Promise.all([
         gl(`/projects/${pid}/merge_requests/${mr.iid}`),
         gl(`/projects/${pid}/merge_requests/${mr.iid}/approvals`),
         glAll(`/projects/${pid}/merge_requests/${mr.iid}/discussions`),
+        gl(`/projects/${pid}/merge_requests/${mr.iid}/blocks`).catch(() => []),
       ]);
       const pipeline = await pipelineHealth(pid, detail.head_pipeline);
       const required = approvals.approvals_required ?? 0;
@@ -232,6 +233,21 @@ export async function fetchOpenCards() {
             ? approvals.approvals_left === 0
             : (approvals.approved_by?.length ?? 0) > 0,
         hasConflicts: Boolean(detail.has_conflicts),
+        // GitLab "Merge request dependencies": MRs that must merge before this one.
+        gitlabBlockers: blocks
+          .map((b) => b.blocking_merge_request)
+          .filter(Boolean)
+          .map((b) => {
+            const [project] = (b.references?.full ?? '').split('!');
+            return {
+              key: `${project}!${b.iid}`,
+              project,
+              iid: b.iid,
+              title: b.title,
+              webUrl: b.web_url,
+              state: b.state,
+            };
+          }),
         inMergeTrain: Boolean(
           detail.merge_when_pipeline_succeeds || detail.auto_merge_enabled,
         ),

@@ -65,10 +65,9 @@ async function sync() {
     assertToken();
     const [open, merged] = await Promise.all([fetchOpenCards(), fetchMergedCards()]);
     const cards = {};
-    for (const card of [...open, ...merged]) {
-      cards[card.key] = { ...card, autoColumn: classify(card) };
-    }
+    for (const card of [...open, ...merged]) cards[card.key] = card;
     resolveMentions(cards);
+    reclassify(cards);
     // Drop a manual override once the MR's real state moves it somewhere new.
     for (const [key, o] of Object.entries(state.overrides)) {
       if (
@@ -254,6 +253,27 @@ app.post('/api/note', (req, res) => {
   res.json({ ok: true, note });
 });
 
+/** Unmerged MRs a card waits on, from board links and GitLab's dependency field. */
+function openBlockersFor(card, cards) {
+  const byKey = new Map();
+  for (const l of state.links) {
+    if (l.from !== card.key || l.type !== 'blocked-by') continue;
+    const other = cards[l.to];
+    if (other && other.state !== 'merged') byKey.set(other.key, { key: other.key, source: 'board' });
+  }
+  for (const b of card.gitlabBlockers ?? []) {
+    if (b.state !== 'merged' && !byKey.has(b.key)) byKey.set(b.key, { ...b, source: 'gitlab' });
+  }
+  return [...byKey.values()];
+}
+
+function reclassify(cards) {
+  for (const card of Object.values(cards)) {
+    card.openBlockers = card.state === 'merged' ? [] : openBlockersFor(card, cards);
+    card.autoColumn = classify(card);
+  }
+}
+
 // `from` depends on `to`: "from is blocked by to" / "from follows to".
 app.post('/api/links', (req, res) => {
   const { from, to, type } = req.body ?? {};
@@ -266,6 +286,7 @@ app.post('/api/links', (req, res) => {
   }
   const link = { id: randomUUID(), from, to, type, createdAt: new Date().toISOString() };
   state.links.push(link);
+  reclassify(state.cards);
   saveState(state);
   res.json(link);
 });
@@ -504,6 +525,7 @@ app.post('/api/suggestions/dismiss', (req, res) => {
 
 app.delete('/api/links/:id', (req, res) => {
   state.links = state.links.filter((l) => l.id !== req.params.id);
+  reclassify(state.cards);
   saveState(state);
   res.json({ ok: true });
 });

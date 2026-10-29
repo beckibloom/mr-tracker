@@ -587,6 +587,21 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
             ⚠ merge conflicts
           </a>
         )}
+        {(card.openBlockers ?? [])
+          .filter((b) => b.source === 'gitlab')
+          .map((b) => (
+            <a
+              key={b.key}
+              className="chip chip--blocked"
+              href={b.webUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={`GitLab dependency: ${b.title}`}
+              {...stopDrag}
+            >
+              ⛓ blocked by {shortRef(b)}
+            </a>
+          ))}
         {!card.postMerge && agentChip(card.agentReview, card.column)}
         {card.approvalsMet && !APPROVED_IMPLIED.has(card.column) && (
           <span className="chip chip--good">approved</span>

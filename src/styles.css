@@ -486,6 +486,17 @@ body {
   color: var(--gl-gray-950);
 }
 
+.chip--blocked {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text-muted);
+  text-decoration: none;
+}
+
+.chip--blocked:hover {
+  text-decoration: underline;
+}
+
 .chip--override {
   background: var(--gl-blue-50);
   color: var(--gl-blue-500);

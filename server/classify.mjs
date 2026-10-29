@@ -23,7 +23,9 @@ export function classify(card) {
   // Shared = reviewers assigned, auto-merge armed, or dragged here by hand.
   if (card.inMergeTrain || card.reviewerCount > 0) return 'waiting-approval';
   const pipelinePassing = card.pipeline.color === 'green' || card.pipeline.color === 'yellow';
-  if (card.agentReview.reviewed && card.agentReview.clean && pipelinePassing) {
+  // Not shareable while it can't merge: conflicts, or an MR it waits on is still open.
+  const blocked = card.hasConflicts || (card.openBlockers?.length ?? 0) > 0;
+  if (card.agentReview.reviewed && card.agentReview.clean && pipelinePassing && !blocked) {
     return 'ready-human';
   }
   return 'agent-iteration';
