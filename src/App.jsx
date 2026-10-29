@@ -305,7 +305,7 @@ const App = () => {
           {view === 'board' && !hidden.has('search') && <SearchBox query={query} onChange={searchFor} hits={searchHits} />}
           {view === 'board' && !hidden.has('sort') && (
             <label className="sort-control">
-              Sort by
+              <span className="sort-label">Sort by</span>
               <select value={sortBy} onChange={(e) => {
                   track('sort');
                   setSortBy(e.target.value);
@@ -317,11 +317,14 @@ const App = () => {
             </label>
           )}
           {board.lastError && <span className="sync-error">⚠ {board.lastError}</span>}
-          <span className="sync-meta">
+          <span
+            className="sync-meta"
+            title={board.pollWindowActive ? undefined : 'Outside the poll window; Refresh still works'}
+          >
             {board.lastSync
               ? `Synced ${new Date(board.lastSync).toLocaleTimeString()}`
               : 'Never synced'}
-            {!board.pollWindowActive && ' · outside poll window'}
+            {!board.pollWindowActive && <span className="sync-window"> · outside poll window</span>}
           </span>
           <button className="btn" onClick={refresh} disabled={refreshing || board.syncing}>
             {refreshing || board.syncing ? 'Syncing…' : 'Refresh'}

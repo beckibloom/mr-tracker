@@ -102,8 +102,10 @@ body {
 /* Top bar */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem 1rem;
   padding: 0.75rem 1.25rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -113,12 +115,75 @@ body {
   font-size: 1.375rem;
   font-weight: 700;
   margin: 0;
+  white-space: nowrap;
 }
 
 .topbar-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.sync-meta {
+  white-space: nowrap;
+}
+
+/* Half-screen and narrower: controls drop to their own full-width row */
+@media (max-width: 1100px) {
+  .topbar-right {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .topbar-right .search-box {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  .topbar-right .search-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .sync-error {
+    flex: 1 1 100%;
+    max-width: none;
+    order: 10;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .topbar h1 {
+    font-size: 1.125rem;
+  }
+
+  .topbar-left {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .sort-label,
+  .sync-window {
+    display: none;
+  }
+
+  .topbar-right .search-box {
+    flex-basis: 100%;
+  }
+
+  .view-btn {
+    padding: 0.25rem 0.5rem;
+  }
 }
 
 .sync-meta {
