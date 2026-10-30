@@ -11,6 +11,7 @@ import TodoTray from './components/TodoTray.jsx';
 import SearchBox from './components/SearchBox.jsx';
 import { buildChains, buildLinkIndex, setProjectAbbr } from './links.js';
 import { matchCards } from './search.js';
+import { useWheelToHorizontal } from './wheel-scroll.js';
 import { track } from './track.js';
 
 const UI_REFRESH_MS = 60 * 1000;
@@ -25,6 +26,8 @@ const App = () => {
   const [launcherActions, setLauncherActions] = useState([]);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState(null);
+  const boardRef = useRef(null);
+  useWheelToHorizontal(boardRef, [view, Boolean(board)]);
   const noticeTimer = useRef(null);
   // A VS Code launch only fills in the prompt, so say where it went and what to do next.
   const announce = (data) => {
@@ -343,7 +346,7 @@ const App = () => {
       </header>
       {view === 'board' && (
         <>
-          <main className="board">
+          <main className="board" ref={boardRef}>
             {board.columns.map((col) => (
               <Column
                 key={col.id}
