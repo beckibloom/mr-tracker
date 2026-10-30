@@ -208,7 +208,8 @@ function baseCard(mr, epicMembers) {
 
 export async function fetchOpenCards() {
   const [open, epicMembers] = await Promise.all([
-    listMyMergeRequests({ state: 'opened' }),
+    // GitLab only recomputes has_conflicts when asked; without this it stays stale for days.
+    listMyMergeRequests({ state: 'opened', with_merge_status_recheck: true }),
     getEpicMembers(),
   ]);
   const cards = await Promise.all(
@@ -232,7 +233,7 @@ export async function fetchOpenCards() {
           required > 0
             ? approvals.approvals_left === 0
             : (approvals.approved_by?.length ?? 0) > 0,
-        hasConflicts: Boolean(detail.has_conflicts),
+        hasConflicts: Boolean(detail.has_conflicts) || detail.detailed_merge_status === 'conflict',
         // GitLab "Merge request dependencies": MRs that must merge before this one.
         gitlabBlockers: blocks
           .map((b) => b.blocking_merge_request)
