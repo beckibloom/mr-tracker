@@ -80,6 +80,31 @@ function parseAgentReview(discussions) {
   return { reviewed: true, clean, issueCount, verdict };
 }
 
+/**
+ * People whose approval a push reset ("reset approvals from @x by pushing to the branch") and who
+ * have not approved again: the review request already went out, so follow up instead of re-asking.
+ */
+function resetApprovers(discussions, approvedBy) {
+  const current = new Set((approvedBy ?? []).map((a) => a.user?.username));
+  const notes = discussions
+    .flatMap((d) => d.notes ?? [])
+    .filter((n) => n.system)
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+  const state = new Map();
+  for (const n of notes) {
+    const body = n.body ?? '';
+    const author = n.author?.username ?? '';
+    if (/^approved this merge request/i.test(body)) state.set(author, 'approved');
+    else if (/^unapproved this merge request/i.test(body)) state.delete(author);
+    else if (/^reset approvals from /i.test(body)) {
+      for (const [, user] of body.matchAll(/@([\w.-]+)/g)) state.set(user, 'reset');
+    }
+  }
+  return [...state.entries()]
+    .filter(([user, s]) => s === 'reset' && !current.has(user) && !isBot(user))
+    .map(([user]) => user);
+}
+
 /** Unresolved threads STARTED by a human reviewer (not a bot, not the MR author). */
 function countUnresolvedHumanThreads(discussions, authorUsername) {
   return discussions.filter((d) => {
@@ -234,6 +259,7 @@ export async function fetchOpenCards() {
             ? approvals.approvals_left === 0
             : (approvals.approved_by?.length ?? 0) > 0,
         hasConflicts: Boolean(detail.has_conflicts) || detail.detailed_merge_status === 'conflict',
+        reapprovalFrom: resetApprovers(discussions, approvals.approved_by),
         // GitLab "Merge request dependencies": MRs that must merge before this one.
         gitlabBlockers: blocks
           .map((b) => b.blocking_merge_request)

@@ -606,6 +606,14 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         {card.approvalsMet && !APPROVED_IMPLIED.has(card.column) && (
           <span className="chip chip--good">approved</span>
         )}
+        {!card.approvalsMet && card.reapprovalFrom?.length > 0 && (
+          <span
+            className="chip chip--reapproval"
+            title="Approved before, then a push reset the approval. Follow up in your existing review request instead of posting a new one."
+          >
+            ↻ re-approval · {card.reapprovalFrom.map((u) => `@${u}`).join(', ')}
+          </span>
+        )}
         {card.inMergeTrain && card.column !== 'merge-train' && (
           <span className="chip chip--muted" title="Auto-merge is set; merges once approved">
             auto-merge

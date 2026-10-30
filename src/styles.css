@@ -470,6 +470,12 @@ body {
 .chip--warn { background: var(--gl-orange-100); color: var(--gl-orange-500); }
 .chip--muted { background: var(--count-bg); color: var(--count-text); }
 /* Conflicts block everything else, so this chip is the loudest thing on a card */
+.chip--reapproval {
+  background: var(--gl-orange-300);
+  color: var(--gl-gray-950);
+  font-weight: 600;
+}
+
 .chip--conflict {
   background: var(--gl-red-500);
   color: #fff;
