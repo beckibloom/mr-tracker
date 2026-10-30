@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
@@ -160,7 +160,12 @@ const textOf = (content) => {
 function readSessionHead(file) {
   const fd = openSync(file, 'r');
   const buf = Buffer.alloc(HEAD_BYTES);
-  const n = readSync(fd, buf, 0, HEAD_BYTES, 0);
+  let n;
+  try {
+    n = readSync(fd, buf, 0, HEAD_BYTES, 0);
+  } finally {
+    closeSync(fd);
+  }
   const head = buf.toString('utf8', 0, n);
   const info = { cwd: null, sessionId: null, title: null, summary: null };
   for (const line of head.split('\n')) {
