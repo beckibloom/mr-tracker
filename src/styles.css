@@ -1606,6 +1606,15 @@ button.card-note-text {
   font-weight: 600;
 }
 
+.logged-table {
+  width: auto;
+}
+
+.logged-table th,
+.logged-table td {
+  min-width: 3.5rem;
+}
+
 .logged-table th.logged-num,
 .logged-table td.logged-num {
   text-align: right;
@@ -1615,12 +1624,6 @@ button.card-note-text {
 
 .logged-date {
   font-weight: 400;
-}
-
-.logged-key {
-  font-family: var(--gl-font-mono);
-  font-size: 0.75rem;
-  white-space: nowrap;
 }
 
 .logged-zero {
@@ -1633,10 +1636,6 @@ button.card-note-text {
 
 .logged-total {
   font-weight: 600;
-}
-
-.logged-table tfoot td {
-  border-bottom: none;
 }
 
 /* Merged tray */

@@ -10,7 +10,7 @@ const dayLabel = (iso) => {
   };
 };
 
-/** Hours already in Jira for the last 7 days, per ticket per day. */
+/** Hours already in Jira per day for the last 7 days, with the week total. */
 const LoggedTime = ({ refreshKey }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -51,16 +51,10 @@ const LoggedTime = ({ refreshKey }) => {
 
       {error && <p className="time-error">⚠ {error}</p>}
       {!data && loading && <p className="time-muted">Reading worklogs from Jira…</p>}
-      {data && data.rows.length === 0 && (
-        <p className="time-muted">Nothing logged in the last 7 days.</p>
-      )}
-
-      {data && data.rows.length > 0 && (
+      {data && (
         <table className="time-table logged-table">
           <thead>
             <tr>
-              <th>Ticket</th>
-              <th>Summary</th>
               {dates.map((d) => {
                 const { weekday, date } = dayLabel(d);
                 return (
@@ -75,49 +69,18 @@ const LoggedTime = ({ refreshKey }) => {
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((r) => {
-              const total = dates.reduce((s, d) => s + r.minutes[d], 0);
-              return (
-                <tr key={r.key}>
-                  <td className="logged-key">
-                    {r.url ? (
-                      <a href={r.url} target="_blank" rel="noreferrer">
-                        {r.key}
-                      </a>
-                    ) : (
-                      r.key
-                    )}
-                  </td>
-                  <td className="time-summary">{r.summary ?? '—'}</td>
-                  {dates.map((d) => (
-                    <td
-                      key={d}
-                      className={`logged-num${r.minutes[d] ? '' : ' logged-zero'}${d === today ? ' logged-today' : ''}`}
-                    >
-                      {fmtHours(r.minutes[d])}
-                    </td>
-                  ))}
-                  <td className="logged-num logged-total">{fmtHours(total)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
             <tr>
-              <td colSpan={2} className="logged-total">
-                Total
-              </td>
               {dayTotals.map((m, i) => (
                 <td
                   key={dates[i]}
-                  className={`logged-num logged-total${dates[i] === today ? ' logged-today' : ''}`}
+                  className={`logged-num${m ? '' : ' logged-zero'}${dates[i] === today ? ' logged-today' : ''}`}
                 >
                   {fmtHours(m)}
                 </td>
               ))}
               <td className="logged-num logged-total">{fmtHours(grandTotal)}</td>
             </tr>
-          </tfoot>
+          </tbody>
         </table>
       )}
     </section>
