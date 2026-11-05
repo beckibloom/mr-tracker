@@ -576,7 +576,7 @@ app.get('/api/time/logged', async (req, res) => {
   }
   const entry = loggedCache;
   try {
-    res.json(await entry.promise);
+    res.json({ ...(await entry.promise), fetchedAt: entry.at });
   } catch (err) {
     if (loggedCache === entry) loggedCache = null;
     res.status(500).json({ error: String(err.message ?? err) });

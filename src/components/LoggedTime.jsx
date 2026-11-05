@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export const fmtClock = (ms) =>
+  new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
 const fmtHours = (m) => (m ? String(+(m / 60).toFixed(2)) : '·');
 
 const dayLabel = (iso) => {
@@ -55,6 +58,9 @@ const LoggedTime = ({ refreshKey, active = true }) => {
         <button className="btn" disabled={loading} onClick={() => load(true)}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
+        {data?.fetchedAt && (
+          <span className="time-muted">Updated {fmtClock(data.fetchedAt)}</span>
+        )}
       </div>
 
       {error && <p className="time-error">⚠ {error}</p>}
