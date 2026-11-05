@@ -80,6 +80,77 @@ export async function addWorklog(key, minutes, date) {
   return body.timeSpent;
 }
 
+const localDay = (d) => d.toLocaleDateString('en-CA');
+
+async function jiraGet(url) {
+  const res = await fetch(url, { headers: { Authorization: jiraAuth(), Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Jira ${res.status} on ${new URL(url).pathname}`);
+  return res.json();
+}
+
+/**
+ * Time the Jira user has logged over the last `days` days, today included, bucketed by
+ * local day: { dates: ['YYYY-MM-DD', …], rows: [{ key, summary, url, minutes: {date: n} }] }.
+ */
+export async function getLoggedTime(days = 7) {
+  if (!hasJiraWrite()) throw new Error('Set JIRA_EMAIL and JIRA_API_TOKEN to read logged time.');
+  const dates = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    dates.push(localDay(d));
+  }
+  const startMs = new Date(`${dates[0]}T00:00:00`).getTime();
+
+  const [me, issues] = await Promise.all([
+    jiraGet(`${JIRA_BASE}/rest/api/3/myself`),
+    (async () => {
+      const found = [];
+      let pageToken = '';
+      do {
+        const url = new URL(`${JIRA_BASE}/rest/api/3/search/jql`);
+        url.searchParams.set(
+          'jql',
+          `worklogAuthor = currentUser() AND worklogDate >= "${dates[0]}" ORDER BY key`,
+        );
+        url.searchParams.set('fields', 'summary');
+        url.searchParams.set('maxResults', '100');
+        if (pageToken) url.searchParams.set('nextPageToken', pageToken);
+        const data = await jiraGet(url);
+        found.push(...(data.issues ?? []));
+        pageToken = data.nextPageToken ?? '';
+      } while (pageToken);
+      return found;
+    })(),
+  ]);
+
+  const rows = await Promise.all(
+    issues.map(async (issue) => {
+      const minutes = Object.fromEntries(dates.map((d) => [d, 0]));
+      let startAt = 0;
+      for (;;) {
+        const url = new URL(`${JIRA_BASE}/rest/api/3/issue/${issue.key}/worklog`);
+        url.searchParams.set('startedAfter', String(startMs - 1));
+        url.searchParams.set('startAt', String(startAt));
+        url.searchParams.set('maxResults', '1000');
+        const data = await jiraGet(url);
+        const page = data.worklogs ?? [];
+        for (const wl of page) {
+          if (wl.author?.accountId !== me.accountId) continue;
+          const day = localDay(new Date(wl.started));
+          if (day in minutes) minutes[day] += Math.round(wl.timeSpentSeconds / 60);
+        }
+        startAt += page.length;
+        if (page.length === 0 || startAt >= (data.total ?? 0)) break;
+      }
+      return { key: issue.key, summary: issue.fields?.summary ?? null, url: jiraUrl(issue.key), minutes };
+    }),
+  );
+
+  return { dates, rows: rows.filter((r) => Object.values(r.minutes).some(Boolean)) };
+}
+
 const EPIC_LABELS = new Set(
   (process.env.FOCUSED_EPIC_LABELS ?? '')
     .split(',')

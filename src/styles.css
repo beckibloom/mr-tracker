@@ -1586,6 +1586,59 @@ button.card-note-text {
   font-size: 0.8125rem;
 }
 
+/* Logged-in-Jira summary, top of the Time panel */
+.logged {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.logged-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.logged-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.logged-table th.logged-num,
+.logged-table td.logged-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.logged-date {
+  font-weight: 400;
+}
+
+.logged-key {
+  font-family: var(--gl-font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.logged-zero {
+  color: var(--text-muted);
+}
+
+.logged-today {
+  background: var(--drag-bg);
+}
+
+.logged-total {
+  font-weight: 600;
+}
+
+.logged-table tfoot td {
+  border-bottom: none;
+}
+
 /* Merged tray */
 .merged-tray {
   border-top: 1px solid var(--border);

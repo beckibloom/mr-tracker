@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import LoggedTime from './LoggedTime.jsx';
+
 const round15 = (m) => Math.round(m / 15) * 15;
 
 const fmtMin = (m) => {
@@ -37,6 +39,7 @@ const TimePanel = () => {
   const [logging, setLogging] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  const [loggedVersion, setLoggedVersion] = useState(0);
 
   const load = useCallback(async (d) => {
     setLoading(true);
@@ -94,6 +97,7 @@ const TimePanel = () => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResults(data.results);
+      setLoggedVersion((v) => v + 1);
     } catch (err) {
       setError(String(err.message ?? err));
     } finally {
@@ -106,6 +110,8 @@ const TimePanel = () => {
 
   return (
     <div className="time-panel">
+      <LoggedTime refreshKey={loggedVersion} />
+
       <div className="time-controls">
         <label>
           Date{' '}

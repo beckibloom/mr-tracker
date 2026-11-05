@@ -168,7 +168,10 @@ allow the app running the server to control Terminal.
 
 ## Time view
 
-The **Time** tab builds a daily worklog proposal from local signals:
+The **Time** tab opens with a table of the hours already logged in Jira over the last 7 days, per ticket
+and per day, with day and ticket totals. It refreshes after each **Log to Jira** write.
+
+Below it, the tab builds a daily worklog proposal from local signals:
 
 - **Local git**: commits you authored that day across every repo under `MRT_DEV_ROOT`
   (ticket from the commit subject, falling back to the branch name).
@@ -178,7 +181,7 @@ The **Time** tab builds a daily worklog proposal from local signals:
 
 Enter total hours, hit **Distribute** (15-minute rounding), adjust, then **Log to Jira… →
 Confirm**. Nothing is written without the confirm step, and no comment body is attached.
-Writing needs `JIRA_EMAIL` + `JIRA_API_TOKEN`.
+Reading and writing worklogs need `JIRA_EMAIL` + `JIRA_API_TOKEN`.
 
 ## Feature usage and hiding
 

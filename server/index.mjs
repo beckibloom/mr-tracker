@@ -19,7 +19,7 @@ import {
 } from './claude.mjs';
 import { classify, COLUMNS } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
-import { addWorklog, hasJiraWrite } from './jira.mjs';
+import { addWorklog, getLoggedTime, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
 import { record, report } from './usage.mjs';
 
@@ -557,6 +557,15 @@ app.get('/api/time', async (req, res) => {
   const date = req.query.date ?? new Date().toLocaleDateString('en-CA');
   try {
     res.json(await buildTimeReport(date, state.cards));
+  } catch (err) {
+    res.status(500).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.get('/api/time/logged', async (req, res) => {
+  const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 31);
+  try {
+    res.json(await getLoggedTime(days));
   } catch (err) {
     res.status(500).json({ error: String(err.message ?? err) });
   }
