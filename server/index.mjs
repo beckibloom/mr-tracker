@@ -562,11 +562,23 @@ app.get('/api/time', async (req, res) => {
   }
 });
 
+// Jira worklog reads take a few seconds (one request per ticket), so the totals are cached briefly
+// and dropped whenever this server writes a worklog.
+const LOGGED_TTL_MS = 5 * 60 * 1000;
+let loggedCache = null; // { key, at, promise }
+
 app.get('/api/time/logged', async (req, res) => {
   const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 31);
+  const key = `${days}:${new Date().toLocaleDateString('en-CA')}`;
+  const fresh = req.query.fresh === '1';
+  if (fresh || !loggedCache || loggedCache.key !== key || Date.now() - loggedCache.at > LOGGED_TTL_MS) {
+    loggedCache = { key, at: Date.now(), promise: getLoggedTime(days) };
+  }
+  const entry = loggedCache;
   try {
-    res.json(await getLoggedTime(days));
+    res.json(await entry.promise);
   } catch (err) {
+    if (loggedCache === entry) loggedCache = null;
     res.status(500).json({ error: String(err.message ?? err) });
   }
 });
@@ -579,6 +591,7 @@ app.post('/api/time/log', async (req, res) => {
   if (!Array.isArray(entries) || entries.length === 0) {
     return res.status(400).json({ error: 'No entries to log.' });
   }
+  loggedCache = null;
   const results = [];
   for (const { key, minutes } of entries) {
     try {

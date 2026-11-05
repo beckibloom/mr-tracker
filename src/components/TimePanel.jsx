@@ -29,7 +29,7 @@ const distribute = (rows, totalMin) => {
   return out;
 };
 
-const TimePanel = () => {
+const TimePanel = ({ active = true }) => {
   const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [hours, setHours] = useState('');
   const [report, setReport] = useState(null);
@@ -109,8 +109,8 @@ const TimePanel = () => {
   const loggable = rows.filter((r) => r.include && r.key && r.minutes > 0);
 
   return (
-    <div className="time-panel">
-      <LoggedTime refreshKey={loggedVersion} />
+    <div className="time-panel" hidden={!active}>
+      <LoggedTime refreshKey={loggedVersion} active={active} />
 
       <div className="time-controls">
         <label>

@@ -21,6 +21,7 @@ const App = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('mrt-theme') ?? 'light');
   const [view, setView] = useState('board');
+  const [timeVisited, setTimeVisited] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort') ?? 'epic');
   const [hoverKey, setHoverKey] = useState(null);
   const [launcherActions, setLauncherActions] = useState([]);
@@ -28,6 +29,12 @@ const App = () => {
   const [notice, setNotice] = useState(null);
   const boardRef = useRef(null);
   useWheelToHorizontal(boardRef, [view, Boolean(board)]);
+
+  // The Time panel stays mounted after its first visit, so its scan, edits and logged totals
+  // survive switching tabs.
+  useEffect(() => {
+    if (view === 'time') setTimeVisited(true);
+  }, [view]);
   const noticeTimer = useRef(null);
   // A VS Code launch only fills in the prompt, so say where it went and what to do next.
   const announce = (data) => {
@@ -368,7 +375,7 @@ const App = () => {
           {!hidden.has('merged') && <MergedTray cards={merged} />}
         </>
       )}
-      {view === 'time' && <TimePanel />}
+      {(view === 'time' || timeVisited) && <TimePanel active={view === 'time'} />}
       {view === 'chains' && <ChainsPanel cards={cards} index={linkIndex} chains={chains} />}
       {view === 'sessions' && (
         <div className="sessions-view">
