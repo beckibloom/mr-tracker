@@ -168,8 +168,8 @@ allow the app running the server to control Terminal.
 
 ## Time view
 
-The **Time** tab opens with a table of the hours already logged in Jira over the last 7 days, per ticket
-and per day, with day and ticket totals. It refreshes after each **Log to Jira** write.
+The **Time** tab opens with the hours already logged in Jira for each of the last 7 days, plus the week
+total. It refreshes after each **Log to Jira** write.
 
 Below it, the tab builds a daily worklog proposal from local signals:
 
