@@ -48,7 +48,8 @@ const stopDrag = {
 const CopyRef = ({ card }) => {
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
-  const text = `${card.project.split('/').pop()}!${card.iid}`;
+  const project = card.project.split('/').pop();
+  const text = `${project}!${card.iid}`;
 
   const copy = async () => {
     await navigator.clipboard.writeText(text);
@@ -64,7 +65,13 @@ const CopyRef = ({ card }) => {
       {...stopDrag}
       title={`Copy ${text}`}
     >
-      {copied ? 'copied ✓' : text}
+      {copied ? (
+        'copied ✓'
+      ) : (
+        <>
+          <span className="copy-ref-project">{project}</span>!{card.iid}
+        </>
+      )}
     </button>
   );
 };
@@ -496,7 +503,6 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           className={`pipeline-dot pipeline-dot--${card.pipeline.color}`}
           title={`Pipeline: ${card.pipeline.status}`}
         />
-        <CopyRef card={card} />
         {card.jiraUrl && (
           <a
             className="jira-icon"
@@ -575,6 +581,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         {card.title.replace(/^Draft:\s*/, '')}
       </a>
       <div className="card-chips">
+        <CopyRef card={card} />
         {card.hasConflicts && (
           <a
             className="chip chip--conflict"
