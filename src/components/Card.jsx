@@ -570,6 +570,9 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           {relTime(card.updatedAt)}
         </span>
       </div>
+      <div className="card-ref-row">
+        <CopyRef card={card} />
+      </div>
       <a
         className="card-title"
         href={card.webUrl}
@@ -581,7 +584,6 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         {card.title.replace(/^Draft:\s*/, '')}
       </a>
       <div className="card-chips">
-        <CopyRef card={card} />
         {card.hasConflicts && (
           <a
             className="chip chip--conflict"
