@@ -28,12 +28,29 @@ export const buildLinkIndex = (cards, links) => {
     if (!index.has(k)) index.set(k, { upstream: [], downstream: [] });
     return index.get(k);
   };
-  for (const link of links) {
+  const add = (link) => {
     const from = byKey.get(link.from);
     const to = byKey.get(link.to);
-    if (!from || !to) continue;
+    if (!from || !to) return;
     entry(link.from).upstream.push({ link, card: to });
     entry(link.to).downstream.push({ link, card: from });
+  };
+  links.forEach(add);
+  // GitLab merge request dependencies act as blocked-by links unless the board already has one.
+  const boardBlocks = new Set(
+    links.filter((l) => l.type === 'blocked-by').map((l) => `${l.from}>${l.to}`),
+  );
+  for (const card of cards) {
+    for (const b of card.gitlabBlockers ?? []) {
+      if (boardBlocks.has(`${card.key}>${b.key}`)) continue;
+      add({
+        id: `gitlab:${card.key}>${b.key}`,
+        from: card.key,
+        to: b.key,
+        type: 'blocked-by',
+        source: 'gitlab',
+      });
+    }
   }
   return index;
 };

@@ -54,7 +54,10 @@ Cards are classified on each sync, in this order:
 | Agent iteration        | Everything else: no AI review yet, or the review raised any issue                 |
 
 A blocker is an unmerged MR the card waits on: a board `blocked by` link or a GitLab
-"Merge request dependency". GitLab-only dependencies show as `⛓ blocked by` chips.
+"Merge request dependency". When both MRs are on the board, a GitLab dependency acts like a
+board link (striped border, Chains tab) and its chip reads `⛓ blocked by`, with no × because
+you change it in GitLab. A dependency on an MR that isn't on the board shows as a `⛓ blocked by`
+chip only.
 
 Drag a card to any column to override the classification. The override sticks until the
 MR's GitLab state would classify it differently, then clears itself. Click the `manual ×`

@@ -423,18 +423,24 @@ const LinkChips = ({ card, entry, signals, onPickSuggestion }) => {
             href={other.webUrl}
             target="_blank"
             rel="noreferrer"
-            title={`${other.project}!${other.iid} — ${other.title}`}
+            title={
+              link.source === 'gitlab'
+                ? `GitLab dependency (change it on the MR in GitLab): ${other.project}!${other.iid} — ${other.title}`
+                : `${other.project}!${other.iid} — ${other.title}`
+            }
           >
-            {label}
+            {link.source === 'gitlab' ? `⛓ ${label}` : label}
           </a>
-          <button
-            className="link-chip-remove"
-            onClick={() => onRemoveLink(link.id)}
-            title="Remove link"
-            aria-label="Remove link"
-          >
-            ×
-          </button>
+          {link.source !== 'gitlab' && (
+            <button
+              className="link-chip-remove"
+              onClick={() => onRemoveLink(link.id)}
+              title="Remove link"
+              aria-label="Remove link"
+            >
+              ×
+            </button>
+          )}
         </span>
       ))}
       {downstream.length > 1 && (
@@ -597,7 +603,10 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           </a>
         )}
         {(card.openBlockers ?? [])
-          .filter((b) => b.source === 'gitlab')
+          // Blockers on the board already show as link chips; this covers ones that aren't.
+          .filter(
+            (b) => b.source === 'gitlab' && !entry?.upstream.some((u) => u.card.key === b.key),
+          )
           .map((b) => (
             <a
               key={b.key}
