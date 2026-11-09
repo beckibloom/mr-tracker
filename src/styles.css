@@ -2234,6 +2234,11 @@ a.review-note:hover {
 }
 .yourmove-row--due .yourmove-reason { color: var(--gl-red-500); font-weight: 600; }
 .yourmove-row--watch .yourmove-reason { color: var(--text-muted); font-style: italic; }
+.yourmove-row--parked .yourmove-ready-toggle { color: var(--text-muted); }
+.yourmove-handoff { flex: none; opacity: 0; }
+.yourmove-row:hover .yourmove-handoff,
+.yourmove-handoff:focus-visible { opacity: 1; }
+.yourmove-row--watch .yourmove-handoff { opacity: 1; }
 :root[data-theme='dark'] .yourmove-row--next .yourmove-due { color: var(--gl-purple-300); }
 :root[data-theme='dark'] .yourmove-row--due .yourmove-reason { color: var(--gl-red-300); }
 

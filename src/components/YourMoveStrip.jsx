@@ -74,8 +74,21 @@ const Row = ({ card, onReveal, extra, reason }) => (
  * every MR waiting on you (‼ first, then the one waiting longest), ‼ MRs waiting on someone else
  * with their next action, Chromatic acceptance waits on your MRs, then later reminders.
  */
-const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], section = false }) => {
+const HandoffButton = ({ card, onHandoff }) =>
+  onHandoff ? (
+    <button
+      type="button"
+      className="btn btn--small yourmove-handoff"
+      onClick={() => onHandoff(card.key, true)}
+      title="An agent is on it: park this until the MR changes (a push, pipeline, approval or column move), the move changes, or a day passes"
+    >
+      agent's on it
+    </button>
+  ) : null;
+
+const YourMoveStrip = ({ cards, onReveal, requestReviews, onHandoff, reminders = [], section = false }) => {
   const [readyOpen, setReadyOpen] = useState(false);
+  const [parkedOpen, setParkedOpen] = useState(false);
   const mine = cards
     .filter((c) => c.turn === 'you')
     .sort(
@@ -109,7 +122,9 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], sectio
         </li>,
       );
       if (readyOpen) {
-        for (const r of ready) rows.push(<Row key={r.key} card={r} onReveal={onReveal} />);
+        for (const r of ready) {
+          rows.push(<Row key={r.key} card={r} onReveal={onReveal} extra={<HandoffButton card={r} onHandoff={onHandoff} />} />);
+        }
       }
       continue;
     }
@@ -118,14 +133,19 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], sectio
         key={card.key}
         card={card}
         onReveal={onReveal}
-        extra={card.turnReason === READY ? requestReviews : null}
+        extra={
+          <>
+            {card.turnReason === READY && requestReviews}
+            <HandoffButton card={card} onHandoff={onHandoff} />
+          </>
+        }
       />,
     );
   }
 
   // ‼ MRs whose move is someone else's still show, with the flag's next step and who holds it.
   const watched = cards
-    .filter((c) => c.important && c.turn && c.turn !== 'you')
+    .filter((c) => c.important && c.turn && c.turn !== 'you' && !c.handoff)
     .map((c) => {
       const who = TURN_TEXT[c.turn] ?? c.turn;
       const what = c.importantInfo?.reason ?? c.waitReason;
@@ -139,6 +159,50 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], sectio
       <Row key={`chromatic:${c.key}`} card={c} onReveal={onReveal} reason={`accept Chromatic snapshots · waiting ${ageText(c.chromatic.since)}`} />
     ));
 
+  // Moves an agent holds, out of the way in one collapsed row; each comes back on its own.
+  const parked = cards.filter((c) => c.handoff);
+  const parkedRows = [];
+  if (parked.length > 0) {
+    parkedRows.push(
+      <li key="parked" className="yourmove-row yourmove-row--parked">
+        <button
+          type="button"
+          className="yourmove-ready-toggle"
+          aria-expanded={parkedOpen}
+          onClick={() => setParkedOpen((o) => !o)}
+        >
+          {parked.length} with an agent {parkedOpen ? '▾' : '▸'}
+        </button>
+      </li>,
+    );
+    if (parkedOpen) {
+      for (const c of parked) {
+        const h = c.handoff;
+        const since = h.session ? 'Claude session working' : `handed off ${ageText(h.at)} ago`;
+        parkedRows.push(
+          <Row
+            key={`parked:${c.key}`}
+            card={c}
+            onReveal={onReveal}
+            reason={`${since} · then ${h.then}`}
+            extra={
+              !h.session && onHandoff ? (
+                <button
+                  type="button"
+                  className="btn btn--small yourmove-handoff"
+                  onClick={() => onHandoff(c.key, false)}
+                  title="Put it back in Your move now"
+                >
+                  take back
+                </button>
+              ) : null
+            }
+          />,
+        );
+      }
+    }
+  }
+
   const [nextStep, ...otherReminders] = reminders;
   const soon = otherReminders.filter((r) => r.daysLeft != null && r.daysLeft <= 2);
   const later = otherReminders.filter((r) => !soon.includes(r));
@@ -148,6 +212,7 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], sectio
     ...rows,
     ...watched,
     ...chromatic,
+    ...parkedRows,
     ...later.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} />),
   ];
 

@@ -22,6 +22,8 @@ export const FEATURES = {
   'card:fold': 'Expanding cards folded under their blocker',
   'yourmove:reveal': 'Showing a Your move item on the board',
   'yourmove:dim': 'Toggling Dim others',
+  'yourmove:handoff': 'Handing a Your move item to an agent',
+  'yourmove:take-back': 'Taking a handed-off item back',
   'card:link': 'Linking MRs (blocks / follows)',
   'card:dismiss-suggestion': 'Dismissing a suggested link',
   'card:copy-review-request': 'Copy review-request message (megaphone)',

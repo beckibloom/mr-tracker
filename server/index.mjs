@@ -73,6 +73,7 @@ for (const [key, flag] of Object.entries(state.important)) {
 state.links ??= [];
 state.dismissed ??= {};
 state.claudeSessions ??= {};
+state.handoffs ??= {};
 state.launcherSessions ??= [];
 state.pendingLaunches ??= [];
 state.since ??= {};
@@ -106,6 +107,7 @@ async function sync() {
       if (!cards[key]) delete state.notes[key];
     }
     clearStaleImportant(cards);
+    clearStaleHandoffs(cards);
     state.links = state.links.filter((l) => cards[l.from] && cards[l.to]);
     for (const key of Object.keys(state.claudeSessions)) {
       if (!cards[key]) delete state.claudeSessions[key];
@@ -215,6 +217,51 @@ function clearStaleImportant(cards) {
   }
 }
 
+// Handoffs (README "Handing a move to an agent"): a Your move card parked while an agent works on
+// it. It comes back when the MR changes, when the move itself changes, or after a day.
+const HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
+
+const columnOf = (card) => state.overrides[card.key]?.column ?? card.autoColumn;
+
+const handoffSnapshot = (card) => ({
+  ...importantSnapshot(card),
+  turnReason: whoseTurn(card, columnOf(card)).turnReason ?? null,
+});
+
+function clearStaleHandoffs(cards) {
+  for (const [key, h] of Object.entries(state.handoffs)) {
+    const card = cards[key];
+    const expired = Date.now() - new Date(h.at).getTime() >= HANDOFF_TTL_MS;
+    if (!card || card.state !== 'opened' || expired) {
+      delete state.handoffs[key];
+      continue;
+    }
+    const now = handoffSnapshot(card);
+    if (Object.keys(now).some((k) => h.snapshot[k] !== now[k])) delete state.handoffs[key];
+  }
+}
+
+/** A `you` turn that an agent holds (handed off, or its Claude session busy) waits on the agent. */
+function withHandoff(card, turn, session) {
+  if (turn.turn !== 'you') return { ...turn, handoff: null };
+  const h = state.handoffs[card.key];
+  const live = h && Date.now() - new Date(h.at).getTime() < HANDOFF_TTL_MS ? h : null;
+  if (!live && session?.status !== 'busy') return { ...turn, handoff: null };
+  return {
+    turn: 'agent',
+    turnReason: null,
+    agentReason: null,
+    waitReason: `wait for the agent, then ${turn.turnReason}`,
+    handoff: {
+      at: live?.at ?? null,
+      by: live?.by ?? null,
+      note: live?.note ?? null,
+      then: turn.turnReason,
+      session: !live,
+    },
+  };
+}
+
 const importantInfo = (key) => {
   const flag = state.important[key];
   return flag ? { reason: flag.reason, by: flag.by, at: flag.at } : null;
@@ -298,18 +345,19 @@ app.use(express.json());
 app.get('/api/board', (_req, res) => {
   adoptPending();
   const cards = Object.values(state.cards).map((card) => {
-    const column = state.overrides[card.key]?.column ?? card.autoColumn;
+    const column = columnOf(card);
+    const session = withStatus(state.claudeSessions[card.key]);
     return {
       ...card,
       column,
-      ...whoseTurn(card, column),
+      ...withHandoff(card, whoseTurn(card, column), session),
       columnSince: state.since[card.key]?.column === column ? state.since[card.key].at : null,
       overridden: Boolean(state.overrides[card.key]),
       note: state.notes[card.key] ?? '',
       important: Boolean(state.important[card.key]),
       importantInfo: importantInfo(card.key),
       suggestions: suggestionsFor(card),
-      claudeSession: withStatus(state.claudeSessions[card.key]),
+      claudeSession: session,
     };
   });
   res.json({
@@ -457,6 +505,29 @@ app.post('/api/note', (req, res) => {
   else delete state.notes[key];
   saveState(state);
   res.json({ ok: true, note });
+});
+
+// Body: { key, handoff, by?, note? }. Parks a Your move card while an agent works on it; see
+// clearStaleHandoffs for when it comes back.
+app.post('/api/handoff', (req, res) => {
+  const { key } = req.body ?? {};
+  const card = state.cards[key];
+  if (!card) return res.status(404).json({ error: `Unknown card ${key}` });
+  if (!req.body?.handoff) {
+    delete state.handoffs[key];
+    saveState(state);
+    return res.json({ ok: true, handoff: false });
+  }
+  if (card.state !== 'opened') return res.status(400).json({ error: 'Only open MRs can be handed off.' });
+  const text = (v, max) => String(v ?? '').trim().slice(0, max) || null;
+  state.handoffs[key] = {
+    at: new Date().toISOString(),
+    by: text(req.body.by, 60),
+    note: text(req.body.note, 200),
+    snapshot: handoffSnapshot(card),
+  };
+  saveState(state);
+  res.json({ ok: true, handoff: true });
 });
 
 // Body: { key, important, reason?, by?, replace? }. Flagging a fourth MR answers 409 with the

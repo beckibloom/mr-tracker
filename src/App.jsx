@@ -168,6 +168,16 @@ const App = () => {
     await load();
   };
 
+  const setHandoff = async (key, handoff) => {
+    track(handoff ? 'yourmove:handoff' : 'yourmove:take-back');
+    await fetch('/api/handoff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, handoff }),
+    });
+    await load();
+  };
+
   const toggleFold = (id) =>
     setOpenFolds((prev) => {
       const next = new Set(prev);
@@ -513,6 +523,7 @@ const App = () => {
                 onReveal={reveal}
                 requestReviews={requestReviews}
                 reminders={board.reminders ?? []}
+                onHandoff={setHandoff}
               />
             </div>
           )}

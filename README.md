@@ -108,7 +108,8 @@ The **Your move** strip above the columns answers "what next", top to bottom:
    turn's next step when the flag has none ("blocked: merge !972 first"). A ‼ never
    leaves the strip just because it waits on a person or CI.
 5. Your MRs whose Chromatic snapshots wait for acceptance.
-6. Later reminders.
+6. `N with an agent ▸`: moves handed to an agent (below), collapsed.
+7. Later reminders.
 
 Click a ref to scroll to its card, unfolding it if needed; the title opens the MR. With nothing
 to do the strip says "Nothing waiting on you".
@@ -116,6 +117,19 @@ to do the strip says "Nothing waiting on you".
 Each card shows its turn as a small label next to its ref. **Dim others** in the top bar fades
 every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`
 hides the strip, the labels and the toggle.
+
+### Handing a move to an agent
+
+When an agent is already working on one of your moves, hover its row and click **agent's on
+it**. The card becomes an `agent` turn ("wait for the agent, then answer 2 threads") and leaves
+the list for the collapsed `N with an agent` row, where **take back** returns it early. It comes
+back by itself as soon as something changes: a push, the pipeline colour, approvals, the
+column, or the move itself. A handoff also lapses after a day, so a stalled agent can't hide a
+move for good. A card whose own Claude session is busy is parked the same way until the session
+goes idle.
+
+Agents and scripts can park a card themselves before they start:
+`POST /api/handoff` with `{ key, handoff: true, by, note }`, and `handoff: false` to undo.
 
 ## Dashboard
 
