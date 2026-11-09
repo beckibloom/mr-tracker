@@ -13,8 +13,8 @@ const STATUS = {
  * Branches built on an open MR's diff and parked until that MR merges (an agent registers them
  * through POST /api/staged). Ready ones float to the top; an entry leaves once its MR opens.
  */
-const StagedTray = ({ staged, onRemove }) => {
-  const [open, setOpen] = useState(false);
+const StagedTray = ({ staged, onRemove, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const ready = staged.filter((s) => s.status === 'ready-to-open').length;
   const sorted = [...staged].sort(
     (a, b) => (b.status === 'ready-to-open' ? 1 : 0) - (a.status === 'ready-to-open' ? 1 : 0) || a.createdAt.localeCompare(b.createdAt),

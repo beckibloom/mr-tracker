@@ -111,34 +111,47 @@ Each card shows its turn as a small label next to its ref. **Dim others** in the
 every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`
 hides the strip, the labels and the toggle.
 
+## Dashboard
+
+The first tab is home: the velocity banner (see Pace header) on top, then the Your move strip,
+the Your review tray and the To-do list as open sections, and the Staged tray while anything is
+staged. Clicking a ref in Your move opens the Board tab on that card. The Board tab is the
+kanban alone, with the merged tray under it. The Dashboard tab's count is the number of MRs
+waiting on you.
+
 ## Pace header
 
 For a long migration (removing a package scope from a monorepo, say), set `MRT_PACE_REPO` to a
-local checkout and `MRT_PACE_SCOPE` to the scope, and a bar under the top bar counts the files
+local checkout and `MRT_PACE_SCOPE` to the scope, and the Dashboard's banner counts the files
 on the main branch that still import it and compares the weekly removal rate with a target
 (`MRT_PACE_TARGET`, default 50):
 
 ```
-780 files left (92 vendor) · this week 102 / 50 · target met this week ▁▂▅▃ · 32/wk 4-wk avg · 45/wk meets Mar 12, 2027 · at this rate: Apr 29, 2027
+TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk · TO FINISH MAR 12 45/wk · AT THIS RATE Apr 28, 2027 · daily bars
 ```
 
 - **Left:** files on `MRT_PACE_REF` (default `origin/main`) with the scope in a module-reference
   position (`from '…'`, `import '…'`, `import('…')`, `require('…')`), in `.ts .tsx .js .jsx .mjs
   .cjs` files, skipping `MRT_PACE_EXCLUDE` paths. A file counts once however many packages it
   imports. `MRT_PACE_SPLIT` paths are counted and also shown on their own.
-- **This week and the colour:** files removed since Monday against the target. The colour
-  follows this week, pro-rated over Monday to Friday: green once the week reaches the target,
-  orange while it is at or above the share the target expects by now (half by Wednesday noon),
-  red when it is behind that share. "expect N by now" shows the share.
+- **Today and the colour:** files removed since midnight against a daily target
+  (`MRT_PACE_DAILY_TARGET`, default the weekly target ÷ 5). The banner's colour follows today,
+  pro-rated over working hours (`MRT_PACE_WORK_HOURS`, default `9-17`): green once today reaches
+  the daily target, orange while it is at or above the share expected by now, red when it is
+  behind ("N behind: expect M by now"), grey on weekends. Merges land in batches, so a morning
+  often reads red until the train delivers.
+- **This week:** files removed since Monday against the weekly target, with met, on track or
+  behind (pro-rated over Monday to Friday).
 - **4-wk avg:** the mean number of files removed per week over the last four whole weeks, Monday to
   Monday. "Removed" is a set difference (files counted last Monday and not this Monday), so code
   moved in from elsewhere doesn't hide a week's progress.
-- **Bars:** files removed each week, the dashed line at the target; the hollow bar is this week so
-  far.
+- **Bars:** files removed each of the last ten working days, the dashed line at the daily
+  target; the hollow bar is today. Friday runs to Monday midnight, so weekend merges count for
+  Friday. Days over three times the target are clipped.
 - **Meets / at this rate:** the weekly rate that reaches zero by `MRT_PACE_GOAL_DATE`, and the date
   the current rate reaches zero. Neither allows for holidays.
 
-The server fetches the ref and recounts at most hourly; **Recount** does it now. `GET /api/pace`
+The server fetches the ref and recounts every 15 minutes; **Recount** does it now. `GET /api/pace`
 returns the same numbers for scripts.
 
 ## Review lanes

@@ -2352,3 +2352,135 @@ a.review-note:hover {
 .program-mr .pipeline-dot { width: 7px; height: 7px; }
 .program-mr-lane { color: var(--text-muted); font-size: 0.6875rem; }
 .program-mr--auto .program-mr-lane { color: var(--gl-green-500); }
+
+/* Dashboard: the home tab, styled like Sessions: a velocity banner, then body sections */
+.dashboard {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 1.25rem;
+}
+
+.dash-banner,
+.dash-section {
+  margin: 1.25rem 1.25rem 0;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dash-banner .pace {
+  align-items: flex-start;
+  gap: 0.75rem 2rem;
+  padding: 0.875rem 1.25rem;
+  background: transparent;
+  border-bottom: none;
+  border-left-width: 6px;
+}
+
+.pace-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 6.5rem;
+}
+
+.pace-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pace-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.pace-value--date {
+  font-size: 1.125rem;
+  padding: 0.375rem 0 0.25rem;
+}
+
+.pace-value--short { color: var(--gl-orange-500); }
+:root[data-theme='dark'] .pace-value--short { color: var(--gl-orange-300); }
+
+.pace-of {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.pace-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pace-tile--lead .pace-status { align-self: flex-start; }
+.pace--good .pace-tile--lead .pace-value { color: var(--gl-green-500); }
+.pace--bad .pace-tile--lead .pace-value { color: var(--gl-red-500); }
+:root[data-theme='dark'] .pace--good .pace-tile--lead .pace-value { color: var(--gl-green-300); }
+:root[data-theme='dark'] .pace--bad .pace-tile--lead .pace-value { color: var(--gl-red-300); }
+
+.pace-tile--bars .pace-bars {
+  height: 2.75rem;
+  margin-top: 0.25rem;
+  gap: 3px;
+}
+
+.pace-tile--bars .pace-bar { width: 10px; }
+
+.dash-banner .pace-actions {
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+/* Sections reuse the strip and trays, minus their full-width chrome */
+.dash-section .yourmove {
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border-bottom: none;
+}
+
+.yourmove--section .yourmove-label,
+.dash-section .merged-toggle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.yourmove--section .yourmove-list {
+  width: 100%;
+  max-height: none;
+}
+
+.yourmove--section .yourmove-row { padding: 0.1875rem 0; }
+
+.dash-section .merged-tray {
+  border-top: none;
+  background: transparent;
+}
+
+.dash-section .merged-toggle { padding: 0.75rem 1.25rem; }
+
+.pace-status--rest { background: var(--count-bg); color: var(--count-text); }
+.pace--rest { border-left-color: var(--gl-gray-200); }
+.pace-sub--good { color: var(--gl-green-500); }
+.pace-sub--bad { color: var(--gl-red-500); }
+.pace-sub--warn { color: var(--gl-orange-500); }
+:root[data-theme='dark'] .pace-sub--good { color: var(--gl-green-300); }
+:root[data-theme='dark'] .pace-sub--bad { color: var(--gl-red-300); }
+:root[data-theme='dark'] .pace-sub--warn { color: var(--gl-orange-300); }
+
+.dash-section .todo-tray { background: transparent; border-top: none; }
+.pace-bar--partial.pace-bar--good { box-shadow: inset 0 0 0 2px var(--gl-green-500); background: transparent; }
+.pace-bar--over { border-top: 3px double var(--surface); }

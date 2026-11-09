@@ -28,7 +28,8 @@ const App = () => {
   const [board, setBoard] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('mrt-theme') ?? 'light');
-  const [view, setView] = useState('board');
+  // The dashboard is home; the kanban is the Board tab.
+  const [view, setView] = useState('dashboard');
   const [timeVisited, setTimeVisited] = useState(false);
   // null until you pick a sort; the server's MRT_DEFAULT_SORT applies meanwhile.
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort'));
@@ -354,6 +355,8 @@ const App = () => {
     const card = cardByKey.get(key);
     const id = card && foldIdOf(card, folds);
     if (id) setOpenFolds((prev) => new Set(prev).add(id));
+    // Rows on the dashboard point at cards on the Board tab.
+    setView('board');
     setFlashKey(key);
   };
   const requestAction = launcherActions.find((a) => a.id === REQUEST_REVIEWS_ID);
@@ -379,6 +382,7 @@ const App = () => {
         sortCards(a, b),
     );
   const merged = board.cards.filter((c) => c.column === 'merged').sort(sortCards);
+  const yourMoveCount = cards.filter((c) => c.turn === 'you').length;
 
   return (
     <BoardContext.Provider value={boardCtx}>
@@ -388,6 +392,13 @@ const App = () => {
           <div className="topbar-left">
             <h1>MR Tracker</h1>
             <nav className="view-switch">
+              <button
+                className={`view-btn${view === 'dashboard' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('dashboard')}
+              >
+                Dashboard
+                {yourMoveCount > 0 && <span className="view-count">{yourMoveCount}</span>}
+              </button>
               <button
                 className={`view-btn${view === 'board' ? ' view-btn--active' : ''}`}
                 onClick={() => showView('board')}
@@ -487,17 +498,49 @@ const App = () => {
           </div>
         )}
       </header>
+      {view === 'dashboard' && (
+        <div className="dashboard">
+          {board.pace && (
+            <div className="dash-banner">
+              <PaceBar onOpenProgram={board.program ? () => showView('program') : null} />
+            </div>
+          )}
+          {!hidden.has('yourmove') && (
+            <div className="dash-section">
+              <YourMoveStrip
+                section
+                cards={cards}
+                onReveal={reveal}
+                requestReviews={requestReviews}
+                reminders={board.reminders ?? []}
+              />
+            </div>
+          )}
+          {board.reviewTray && !hidden.has('review') && (
+            <div className="dash-section">
+              <ReviewTray cards={forReview} showNotes={board.reviewNotes} defaultOpen />
+            </div>
+          )}
+          {!hidden.has('todos') && (
+            <div className="dash-section">
+              <TodoTray
+                todos={board.todos ?? []}
+                onAdd={addTodo}
+                onToggle={toggleTodo}
+                onDelete={deleteTodo}
+                defaultOpen
+              />
+            </div>
+          )}
+          {!hidden.has('staged') && (board.staged?.length ?? 0) > 0 && (
+            <div className="dash-section">
+              <StagedTray staged={board.staged} onRemove={removeStaged} defaultOpen />
+            </div>
+          )}
+        </div>
+      )}
       {view === 'board' && (
         <>
-          {board.pace && <PaceBar onOpenProgram={board.program ? () => showView('program') : null} />}
-          {!hidden.has('yourmove') && (
-            <YourMoveStrip
-              cards={cards}
-              onReveal={reveal}
-              requestReviews={requestReviews}
-              reminders={board.reminders ?? []}
-            />
-          )}
           <main className="board" ref={boardRef}>
             {board.columns.map((col) => (
               <Column
@@ -510,20 +553,6 @@ const App = () => {
               />
             ))}
           </main>
-          {board.reviewTray && !hidden.has('review') && (
-            <ReviewTray cards={forReview} showNotes={board.reviewNotes} />
-          )}
-          {!hidden.has('staged') && (board.staged?.length ?? 0) > 0 && (
-            <StagedTray staged={board.staged} onRemove={removeStaged} />
-          )}
-          {!hidden.has('todos') && (
-            <TodoTray
-              todos={board.todos ?? []}
-              onAdd={addTodo}
-              onToggle={toggleTodo}
-              onDelete={deleteTodo}
-            />
-          )}
           {!hidden.has('merged') && <MergedTray cards={merged} />}
         </>
       )}

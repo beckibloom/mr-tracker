@@ -74,7 +74,7 @@ const Row = ({ card, onReveal, extra, reason }) => (
  * every MR waiting on you (‼ first, then the one waiting longest), ‼ MRs waiting on someone else
  * with their next action, Chromatic acceptance waits on your MRs, then later reminders.
  */
-const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [] }) => {
+const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], section = false }) => {
   const [readyOpen, setReadyOpen] = useState(false);
   const mine = cards
     .filter((c) => c.turn === 'you')
@@ -152,7 +152,7 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [] }) => {
   ];
 
   return (
-    <section className="yourmove" aria-label="Your move">
+    <section className={`yourmove${section ? ' yourmove--section' : ''}`} aria-label="Your move">
       <span className="yourmove-label">
         Your move{mine.length > 0 && <span className="view-count">{mine.length}</span>}
       </span>

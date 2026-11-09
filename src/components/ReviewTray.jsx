@@ -42,8 +42,8 @@ const waitText = (iso) => {
 const VERDICT_TEXT = { approve: 'our review: approve', 'request-changes': 'our review: changes' };
 
 /** MRs a review author built for you to approve; a red dot while any is ready and unapproved. */
-const ReviewTray = ({ cards, showNotes }) => {
-  const [open, setOpen] = useState(false);
+const ReviewTray = ({ cards, showNotes, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const { searchSet } = useContext(BoardContext);
   const revealed = !open && cards.some((c) => searchSet?.has(c.key));
   const shown = open || revealed;

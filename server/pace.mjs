@@ -31,13 +31,19 @@ const TARGET = Number(process.env.MRT_PACE_TARGET ?? 50);
 const LABEL = process.env.MRT_PACE_LABEL ?? 'files';
 // The date the plan promises; the header shows the weekly rate that would meet it.
 const GOAL_DATE = process.env.MRT_PACE_GOAL_DATE ?? '';
+// A working day's share of the weekly target (Monday to Friday).
+const DAILY_TARGET = Number(process.env.MRT_PACE_DAILY_TARGET ?? 0) || Math.ceil(TARGET / 5);
+// Working hours for pro-rating today, local time, e.g. 9-17.
+const [DAY_START, DAY_END] = (process.env.MRT_PACE_WORK_HOURS ?? '9-17').split('-').map(Number);
+const DAYS = 10; // working days shown as daily bars
 const WEEKS = 8;
 const WINDOW_WEEKS = 4;
-const REFRESH_MS = 60 * 60 * 1000;
+const REFRESH_MS = 15 * 60 * 1000; // fetch and recount; today's colour lags merges by at most this
 const EXTENSIONS = ['*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'];
 
 export const PACE_ENABLED = Boolean(REPO && SCOPE);
 
+const localDate = (d) => d.toLocaleDateString('en-CA');
 const ere = (s) => s.replace(/[.^$*+?()[\]{}|\\]/g, '\\$&');
 const PATTERN = `(from |import\\(|require\\(|import )['"]${ere(SCOPE)}[a-z0-9._-]*`;
 const PACKAGE_RE = new RegExp(`${SCOPE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[a-z0-9._-]*`);
@@ -119,6 +125,27 @@ function weekFraction(d = new Date()) {
   const day = (d.getDay() + 6) % 7; // Monday 0
   if (day >= 5) return 1;
   return Math.min((day + (d.getHours() + d.getMinutes() / 60) / 24) / 5, 1);
+}
+
+/** How much of today's working hours has passed, 0 to 1; null on a weekend. */
+function dayFraction(d = new Date()) {
+  const day = (d.getDay() + 6) % 7;
+  if (day >= 5) return null;
+  const h = d.getHours() + d.getMinutes() / 60;
+  return Math.min(Math.max((h - DAY_START) / (DAY_END - DAY_START), 0), 1);
+}
+
+/** Midnight of the last `n` working days before today, oldest first, then today's midnight. */
+function workdayStarts(n) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const out = [];
+  const d = new Date(today);
+  while (out.length < n) {
+    d.setDate(d.getDate() - 1);
+    if ((d.getDay() + 6) % 7 < 5) out.unshift(new Date(d));
+  }
+  return [...out, today];
 }
 
 const mondayOf = (d) => {
@@ -206,8 +233,38 @@ async function compute() {
   // The header's colour is this week against the target, pro-rated over the working week
   // (Monday to Friday): by Wednesday noon the week should have removed half the target.
   const expectedByNow = Math.ceil(TARGET * weekFraction());
-  const status =
+  const weekStatus =
     now.removed == null ? 'unknown' : now.removed >= TARGET ? 'good' : now.removed >= expectedByNow ? 'warn' : 'bad';
+
+  // Daily: files removed each working day (midnight to midnight, or to now for today). The
+  // header's colour is today against the daily target, pro-rated over working hours.
+  const starts = workdayStarts(DAYS);
+  const daySets = [];
+  for (const d of starts) {
+    const sha = await shaAt(d);
+    daySets.push(sha ? await census(sha) : null);
+  }
+  const daily = starts.map((d, i) => {
+    const from = daySets[i];
+    const to = i + 1 < starts.length ? daySets[i + 1] : head;
+    // Each day runs to the next working day's midnight, so weekend merges count for Friday.
+    return {
+      date: localDate(d),
+      ...(from && to ? diff(from, to) : { removed: null, added: null }),
+      today: i === starts.length - 1,
+    };
+  });
+  const today = daily[daily.length - 1];
+  const fraction = dayFraction();
+  const expectedToday = fraction == null ? null : Math.ceil(DAILY_TARGET * fraction);
+  const status =
+    fraction == null || today.removed == null
+      ? 'rest'
+      : today.removed >= DAILY_TARGET
+        ? 'good'
+        : today.removed >= expectedToday
+          ? 'warn'
+          : 'bad';
 
   return {
     enabled: true,
@@ -221,7 +278,12 @@ async function compute() {
     perWeek,
     thisWeek: now.removed,
     expectedByNow,
+    weekStatus,
     avgStatus,
+    dailyTarget: DAILY_TARGET,
+    expectedToday,
+    today: { removed: today.removed, added: today.added },
+    daily,
     neededForGoal,
     finishAtRate,
     status,

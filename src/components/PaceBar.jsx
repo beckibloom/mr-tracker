@@ -2,48 +2,51 @@ import { useEffect, useState } from 'react';
 
 import { track } from '../track.js';
 
-const REFRESH_MS = 10 * 60 * 1000;
+const REFRESH_MS = 5 * 60 * 1000;
 
 const shortDate = (iso) =>
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
-// This week against the target, pro-rated over Monday to Friday (server/pace.mjs).
+// Today against the daily target, pro-rated over working hours (server/pace.mjs).
 const STATUS_TEXT = {
-  good: 'target met this week',
-  warn: 'on track this week',
-  bad: 'behind this week',
+  good: 'daily target met',
+  warn: 'on track today',
+  bad: 'behind today',
+  rest: 'no target today',
   unknown: 'no count yet',
 };
 
-/** Weekly removals as tiny bars, oldest first; the current partial week is hollow. */
-const Bars = ({ points, now, target }) => {
-  const weeks = points.filter((p) => p.removed != null);
-  const max = Math.max(target, ...weeks.map((p) => p.removed), now.removed ?? 0, 1);
+const WEEK_TEXT = { good: 'met', warn: 'on track', bad: 'behind', unknown: '' };
+
+const weekday = (iso) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' });
+
+/** Files removed each working day, oldest first; today is hollow. Dashed line: daily target. */
+const Bars = ({ days, target }) => {
+  const shown = days.filter((d) => d.removed != null);
+  // Scale to three times the target so one big merge day doesn't flatten the rest; taller days
+  // are clipped and marked.
+  const max = Math.max(target * 3, 1);
   return (
     <span className="pace-bars" aria-hidden="true">
-      {weeks.map((p) => (
+      {shown.map((d) => (
         <span
-          key={p.date}
-          className={`pace-bar${p.removed >= target ? ' pace-bar--good' : ''}`}
-          style={{ height: `${Math.max((p.removed / max) * 100, 4)}%` }}
-          title={`Week to ${p.date}: ${p.removed} removed, ${p.added} added, ${p.total} left`}
+          key={d.date}
+          className={`pace-bar${d.removed >= target ? ' pace-bar--good' : ''}${d.today ? ' pace-bar--partial' : ''}${
+            d.removed > max ? ' pace-bar--over' : ''
+          }`}
+          style={{ height: `${Math.min(Math.max((d.removed / max) * 100, 4), 100)}%` }}
+          title={`${d.today ? 'Today so far' : weekday(d.date)}: ${d.removed} removed, ${d.added} added`}
         />
       ))}
-      {now.removed != null && (
-        <span
-          className="pace-bar pace-bar--partial"
-          style={{ height: `${Math.max((now.removed / max) * 100, 4)}%` }}
-          title={`This week so far: ${now.removed} removed, ${now.added} added`}
-        />
-      )}
       <span className="pace-target" style={{ bottom: `${(target / max) * 100}%` }} />
     </span>
   );
 };
 
 /**
- * The pace header: files left on main, the four-week removal rate against the target, and the
- * date that rate reaches zero. Shown when MRT_PACE_REPO is set (README "Pace header").
+ * The velocity banner: today and this week against their targets (the colour follows today),
+ * files left on main, the four-week rate, and the date that rate reaches zero. Shown when MRT_PACE_REPO is set (README "Pace header").
  */
 const PaceBar = ({ onOpenProgram }) => {
   const [pace, setPace] = useState(null);
@@ -64,41 +67,73 @@ const PaceBar = ({ onOpenProgram }) => {
   if (pace.error) return <section className="pace pace--bad">Pace: {pace.error}</section>;
   if (!pace.enabled) return null;
 
-  const { now, perWeek, target, status } = pace;
+  const { now, perWeek, target, status, today, dailyTarget, expectedToday } = pace;
+  const behind = today.removed != null && expectedToday != null && today.removed < expectedToday;
   return (
-    <section className={`pace pace--${status}`} aria-label="Migration pace">
-      <span className="pace-main">
-        <strong>{now.total}</strong> {pace.label} left
-        {pace.splitLabel && now.split > 0 && (
-          <span className="pace-muted">
-            {' '}
-            ({now.split} {pace.splitLabel})
+    <section className={`pace pace--${status}`} aria-label="Velocity">
+      <div
+        className="pace-tile pace-tile--lead"
+        title={`Files removed since midnight, against the daily target (${dailyTarget}) pro-rated over working hours`}
+      >
+        <span className="pace-label">Today</span>
+        <span className="pace-value">
+          {today.removed ?? '—'}
+          <span className="pace-of"> / {dailyTarget}</span>
+        </span>
+        <span className={`pace-status pace-status--${status}`}>{STATUS_TEXT[status]}</span>
+        {expectedToday != null && today.removed != null && today.removed < dailyTarget && (
+          <span className="pace-sub">
+            {behind ? `${expectedToday - today.removed} behind: ` : ''}expect {expectedToday} by now
           </span>
         )}
-      </span>
-      <span
-        className="pace-rate"
-        title={`Files removed since Monday. By now the week should have removed ${pace.expectedByNow} (the target pro-rated over Monday to Friday).`}
+      </div>
+      <div
+        className="pace-tile"
+        title={`Files removed since Monday. By now the week should have removed ${pace.expectedByNow}.`}
       >
-        this week <strong>{now.removed ?? '—'}</strong> / {target}
-        {now.removed != null && now.removed < target && (
-          <span className="pace-muted"> (expect {pace.expectedByNow} by now)</span>
-        )}
-      </span>
-      <span className={`pace-status pace-status--${status}`}>{STATUS_TEXT[status]}</span>
-      <Bars points={pace.points} now={now} target={target} />
-      <span className="pace-muted" title={`Mean files removed per week over the last ${pace.windowWeeks} whole weeks`}>
-        {perWeek ?? '—'}/wk {pace.windowWeeks}-wk avg
-      </span>
-      {pace.goalDate && pace.neededForGoal != null && (
-        <span className="pace-muted" title={`Files left ÷ weeks to ${pace.goalDate}, without holidays`}>
-          {pace.neededForGoal}/wk meets {shortDate(pace.goalDate)}
+        <span className="pace-label">This week</span>
+        <span className="pace-value">
+          {now.removed ?? '—'}
+          <span className="pace-of"> / {target}</span>
         </span>
+        <span className={`pace-sub pace-sub--${pace.weekStatus}`}>{WEEK_TEXT[pace.weekStatus] ?? ''}</span>
+      </div>
+      <div className="pace-tile">
+        <span className="pace-label">Left on main</span>
+        <span className="pace-value">{now.total}</span>
+        <span className="pace-sub">
+          {pace.label}
+          {pace.splitLabel && now.split > 0 ? ` · ${now.split} ${pace.splitLabel}` : ''}
+        </span>
+      </div>
+      <div className="pace-tile" title={`Mean files removed per week over the last ${pace.windowWeeks} whole weeks`}>
+        <span className="pace-label">{pace.windowWeeks}-week average</span>
+        <span className={`pace-value${perWeek != null && perWeek < target ? ' pace-value--short' : ''}`}>
+          {perWeek ?? '—'}
+          <span className="pace-of">/wk</span>
+        </span>
+        <span className="pace-sub">needs {target} a week</span>
+      </div>
+      {pace.goalDate && pace.neededForGoal != null && (
+        <div className="pace-tile" title={`Files left ÷ weeks to ${pace.goalDate}, without holidays`}>
+          <span className="pace-label">To finish {shortDate(pace.goalDate)}</span>
+          <span className="pace-value">
+            {pace.neededForGoal}
+            <span className="pace-of">/wk</span>
+          </span>
+          <span className="pace-sub">from now on</span>
+        </div>
       )}
-      <span className="pace-muted" title="Files left ÷ the 4-week rate, without holidays">
-        at this rate: {shortDate(pace.finishAtRate)}
-      </span>
-      <span className="pace-actions">
+      <div className="pace-tile" title={`Files left ÷ the ${pace.windowWeeks}-week average, without holidays`}>
+        <span className="pace-label">At this rate</span>
+        <span className="pace-value pace-value--date">{shortDate(pace.finishAtRate)}</span>
+        <span className="pace-sub">count reaches zero</span>
+      </div>
+      <div className="pace-tile pace-tile--bars">
+        <span className="pace-label">Removed each day</span>
+        <Bars days={pace.daily ?? []} target={dailyTarget} />
+      </div>
+      <div className="pace-actions">
         {onOpenProgram && (
           <button type="button" className="btn btn--small" onClick={onOpenProgram}>
             Families
@@ -121,7 +156,7 @@ const PaceBar = ({ onOpenProgram }) => {
         >
           {busy ? 'Counting…' : 'Recount'}
         </button>
-      </span>
+      </div>
     </section>
   );
 };

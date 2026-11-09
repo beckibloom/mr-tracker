@@ -15,8 +15,8 @@ const linkify = (text) =>
     ),
   );
 
-const TodoTray = ({ todos, onAdd, onToggle, onDelete }) => {
-  const [open, setOpen] = useState(false);
+const TodoTray = ({ todos, onAdd, onToggle, onDelete, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const [draft, setDraft] = useState('');
   const openCount = todos.filter((t) => !t.done).length;
 
