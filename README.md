@@ -121,7 +121,7 @@ hides the strip, the labels and the toggle.
 
 The first tab is home: the velocity banner (see Pace header) on top, then the Your move strip,
 the Your review tray and the To-do list as open sections, and the Staged tray while anything is
-staged. Clicking a ref in Your move opens the Board tab on that card. The Board tab is the
+staged. Clicking a ref in Your move opens the MRs tab on that card. The MRs tab is the
 kanban alone, with the merged tray under it. The Dashboard tab's count is the number of MRs
 waiting on you.
 

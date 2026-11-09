@@ -403,7 +403,7 @@ const App = () => {
                 className={`view-btn${view === 'board' ? ' view-btn--active' : ''}`}
                 onClick={() => showView('board')}
               >
-                Board
+                MRs
               </button>
               {!hidden.has('sessions') && (
                 <button
