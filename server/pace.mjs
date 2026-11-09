@@ -35,7 +35,9 @@ const GOAL_DATE = process.env.MRT_PACE_GOAL_DATE ?? '';
 const DAILY_TARGET = Number(process.env.MRT_PACE_DAILY_TARGET ?? 0) || Math.ceil(TARGET / 5);
 // Working hours for pro-rating today, local time, e.g. 9-17.
 const [DAY_START, DAY_END] = (process.env.MRT_PACE_WORK_HOURS ?? '9-17').split('-').map(Number);
-const DAYS = 10; // working days shown as daily bars
+const DAYS = 10; // working days shown as daily bars, and the window of the daily average
+// Days off (YYYY-MM-DD): no daily target, and projections skip them.
+const HOLIDAYS = new Set(csv(process.env.MRT_PACE_HOLIDAYS ?? ''));
 const WEEKS = 8;
 const WINDOW_WEEKS = 4;
 const REFRESH_MS = 15 * 60 * 1000; // fetch and recount; today's colour lags merges by at most this
@@ -127,10 +129,11 @@ function weekFraction(d = new Date()) {
   return Math.min((day + (d.getHours() + d.getMinutes() / 60) / 24) / 5, 1);
 }
 
-/** How much of today's working hours has passed, 0 to 1; null on a weekend. */
+const isWorkday = (d) => (d.getDay() + 6) % 7 < 5 && !HOLIDAYS.has(localDate(d));
+
+/** How much of today's working hours has passed, 0 to 1; null on a weekend or holiday. */
 function dayFraction(d = new Date()) {
-  const day = (d.getDay() + 6) % 7;
-  if (day >= 5) return null;
+  if (!isWorkday(d)) return null;
   const h = d.getHours() + d.getMinutes() / 60;
   return Math.min(Math.max((h - DAY_START) / (DAY_END - DAY_START), 0), 1);
 }
@@ -143,9 +146,30 @@ function workdayStarts(n) {
   const d = new Date(today);
   while (out.length < n) {
     d.setDate(d.getDate() - 1);
-    if ((d.getDay() + 6) % 7 < 5) out.unshift(new Date(d));
+    if (isWorkday(d)) out.unshift(new Date(d));
   }
   return [...out, today];
+}
+
+/** Working days after today up to and including `iso`. */
+function workdaysUntil(iso) {
+  const end = new Date(`${iso}T12:00:00`);
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  let n = 0;
+  for (d.setDate(d.getDate() + 1); d <= end; d.setDate(d.getDate() + 1)) if (isWorkday(d)) n += 1;
+  return n;
+}
+
+/** The date `n` working days after today. */
+function addWorkdays(n) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  for (let left = n; left > 0; ) {
+    d.setDate(d.getDate() + 1);
+    if (isWorkday(d)) left -= 1;
+  }
+  return localDate(d);
 }
 
 const mondayOf = (d) => {
@@ -256,6 +280,17 @@ async function compute() {
   });
   const today = daily[daily.length - 1];
   const fraction = dayFraction();
+
+  // Projections on the daily rate: the mean over the last DAYS working days, today included,
+  // stepped over working days only (no weekends or holidays).
+  const recentDays = daily.slice(-DAYS).filter((d) => d.removed != null);
+  const perDay = recentDays.length
+    ? Math.round((recentDays.reduce((n, d) => n + d.removed, 0) / recentDays.length) * 10) / 10
+    : null;
+  const finishAtDailyRate = perDay > 0 ? addWorkdays(Math.ceil(now.total / perDay)) : null;
+  // What's left of today counts as part of a day.
+  const workdaysToGoal = GOAL_DATE ? workdaysUntil(GOAL_DATE) + (fraction == null ? 0 : 1 - fraction) : null;
+  const neededPerDay = workdaysToGoal ? Math.ceil(now.total / Math.max(workdaysToGoal, 0.5)) : null;
   const expectedToday = fraction == null ? null : Math.ceil(DAILY_TARGET * fraction);
   const status =
     fraction == null || today.removed == null
@@ -281,6 +316,11 @@ async function compute() {
     weekStatus,
     avgStatus,
     dailyTarget: DAILY_TARGET,
+    perDay,
+    perDayWindow: DAYS,
+    finishAtDailyRate,
+    neededPerDay,
+    workdaysToGoal: workdaysToGoal == null ? null : Math.round(workdaysToGoal * 10) / 10,
     expectedToday,
     today: { removed: today.removed, added: today.added },
     daily,

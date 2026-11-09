@@ -114,20 +114,28 @@ const PaceBar = ({ onOpenProgram }) => {
         </span>
         <span className="pace-sub">needs {target} a week</span>
       </div>
-      {pace.goalDate && pace.neededForGoal != null && (
-        <div className="pace-tile" title={`Files left ÷ weeks to ${pace.goalDate}, without holidays`}>
+      {pace.goalDate && pace.neededPerDay != null && (
+        <div
+          className="pace-tile"
+          title={`Files left ÷ working days to ${pace.goalDate} (weekends and holidays skipped; what's left of today counts)`}
+        >
           <span className="pace-label">To finish {shortDate(pace.goalDate)}</span>
-          <span className="pace-value">
-            {pace.neededForGoal}
-            <span className="pace-of">/wk</span>
+          <span className={`pace-value${pace.perDay != null && pace.perDay < pace.neededPerDay ? ' pace-value--short' : ''}`}>
+            {pace.neededPerDay}
+            <span className="pace-of">/day</span>
           </span>
-          <span className="pace-sub">from now on</span>
+          <span className="pace-sub">{Math.floor(pace.workdaysToGoal)} working days left</span>
         </div>
       )}
-      <div className="pace-tile" title={`Files left ÷ the ${pace.windowWeeks}-week average, without holidays`}>
+      <div
+        className="pace-tile"
+        title={`Files left ÷ the ${pace.perDayWindow}-working-day average (today included), counting working days only`}
+      >
         <span className="pace-label">At this rate</span>
-        <span className="pace-value pace-value--date">{shortDate(pace.finishAtRate)}</span>
-        <span className="pace-sub">count reaches zero</span>
+        <span className="pace-value pace-value--date">{shortDate(pace.finishAtDailyRate)}</span>
+        <span className="pace-sub">
+          at {pace.perDay ?? '—'}/day ({pace.perDayWindow}-day avg)
+        </span>
       </div>
       <div className="pace-tile pace-tile--bars">
         <span className="pace-label">Removed each day</span>

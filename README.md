@@ -147,7 +147,7 @@ on the main branch that still import it and compares the weekly removal rate wit
 (`MRT_PACE_TARGET`, default 50):
 
 ```
-TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk · TO FINISH MAR 12 45/wk · AT THIS RATE Apr 28, 2027 · daily bars
+TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk · TO FINISH MAR 12 10/day · AT THIS RATE Jan 21, 2027 · daily bars
 ```
 
 - **Left:** files on `MRT_PACE_REF` (default `origin/main`) with the scope in a module-reference
@@ -168,8 +168,10 @@ TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk 
 - **Bars:** files removed each of the last ten working days, the dashed line at the daily
   target; the hollow bar is today. Friday runs to Monday midnight, so weekend merges count for
   Friday. Days over three times the target are clipped.
-- **Meets / at this rate:** the weekly rate that reaches zero by `MRT_PACE_GOAL_DATE`, and the date
-  the current rate reaches zero. Neither allows for holidays.
+- **To finish / at this rate:** both run on working days, skipping weekends and
+  `MRT_PACE_HOLIDAYS`. "To finish" is files left ÷ working days to `MRT_PACE_GOAL_DATE` (what's
+  left of today counts), as files a day; orange when the daily average is below it. "At this
+  rate" is the date the mean of the last ten working days (today included) reaches zero.
 
 The server fetches the ref and recounts every 15 minutes; **Recount** does it now. `GET /api/pace`
 returns the same numbers for scripts.
@@ -494,6 +496,8 @@ The rest:
 | `MRT_PACE_REF`, `MRT_PACE_EXCLUDE` | `origin/main`, — | Ref counted; comma-separated path prefixes skipped. |
 | `MRT_PACE_SPLIT`, `MRT_PACE_SPLIT_LABEL` | — | A path prefix counted and also shown on its own, and its label. |
 | `MRT_PACE_TARGET`, `MRT_PACE_GOAL_DATE`, `MRT_PACE_LABEL` | `50`, —, `files` | Weekly target, the date the plan promises, and the header's noun. |
+| `MRT_PACE_HOLIDAYS` | — | Comma-separated `YYYY-MM-DD` days off: no daily target, and projections skip them. |
+| `MRT_PACE_DAILY_TARGET`, `MRT_PACE_WORK_HOURS` | weekly target ÷ 5, `9-17` | Files a working day, and the hours today's share is spread over. |
 | `MRT_LANE_PROJECTS` | — | Projects whose cards show a review-lane chip. |
 | `MRT_LANE_MAX_FILES`, `MRT_LANE_RISK_MAX`, `MRT_LANE_HUMAN_PATHS` | `7`, `45`, — | Auto-lane size, the risk score the bot approves at, and paths that always need a person (regex). |
 | `MRT_FLAKY_JOBS` | — | Regex of job names known to flake. |
