@@ -384,102 +384,108 @@ const App = () => {
     <BoardContext.Provider value={boardCtx}>
     <div className="app">
       <header className="topbar">
-        <div className="topbar-left">
-          <h1>MR Tracker</h1>
-          <nav className="view-switch">
-            <button
-              className={`view-btn${view === 'board' ? ' view-btn--active' : ''}`}
-              onClick={() => showView('board')}
+        <div className="topbar-main">
+          <div className="topbar-left">
+            <h1>MR Tracker</h1>
+            <nav className="view-switch">
+              <button
+                className={`view-btn${view === 'board' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('board')}
+              >
+                Board
+              </button>
+              {!hidden.has('sessions') && (
+                <button
+                  className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
+                  onClick={() => showView('sessions')}
+                >
+                  Sessions
+                </button>
+              )}
+              {!hidden.has('chains') && (
+                <button
+                  className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
+                  onClick={() => showView('chains')}
+                >
+                  Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
+                </button>
+              )}
+              {board.program && (
+                <button
+                  className={`view-btn${view === 'program' ? ' view-btn--active' : ''}`}
+                  onClick={() => showView('program')}
+                >
+                  {board.epicLabel || 'Program'}
+                </button>
+              )}
+              {!hidden.has('time') && (
+                <button
+                  className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
+                  onClick={() => showView('time')}
+                >
+                  Time
+                </button>
+              )}
+            </nav>
+          </div>
+          <div className="topbar-status">
+            {board.lastError && <span className="sync-error">⚠ {board.lastError}</span>}
+            <span
+              className="sync-meta"
+              title={board.pollWindowActive ? undefined : 'Outside the poll window; Refresh still works'}
             >
-              Board
+              {board.lastSync
+                ? `Synced ${new Date(board.lastSync).toLocaleTimeString()}`
+                : 'Never synced'}
+              {!board.pollWindowActive && <span className="sync-window"> · outside poll window</span>}
+            </span>
+            <button className="btn" onClick={refresh} disabled={refreshing || board.syncing}>
+              {refreshing || board.syncing ? 'Syncing…' : 'Refresh'}
             </button>
-            {!hidden.has('sessions') && (
-              <button
-                className={`view-btn${view === 'sessions' ? ' view-btn--active' : ''}`}
-                onClick={() => showView('sessions')}
-              >
-                Sessions
-              </button>
-            )}
-            {!hidden.has('chains') && (
-              <button
-                className={`view-btn${view === 'chains' ? ' view-btn--active' : ''}`}
-                onClick={() => showView('chains')}
-              >
-                Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
-              </button>
-            )}
-            {board.program && (
-              <button
-                className={`view-btn${view === 'program' ? ' view-btn--active' : ''}`}
-                onClick={() => showView('program')}
-              >
-                {board.epicLabel || 'Program'}
-              </button>
-            )}
-            {!hidden.has('time') && (
-              <button
-                className={`view-btn${view === 'time' ? ' view-btn--active' : ''}`}
-                onClick={() => showView('time')}
-              >
-                Time
-              </button>
-            )}
-          </nav>
-        </div>
-        <div className="topbar-right">
-          {view === 'board' && !hidden.has('search') && <SearchBox query={query} onChange={searchFor} hits={searchHits} />}
-          {view === 'board' && !hidden.has('sort') && (
-            <label className="sort-control">
-              <span className="sort-label">Sort by</span>
-              <select value={sortKey} onChange={(e) => {
-                  track('sort');
-                  setSortBy(e.target.value);
-                }}>
-                <option value="epic">Epic first</option>
-                <option value="unblock">Epic, then unblocks most</option>
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
-            </label>
-          )}
-          {view === 'board' && !hidden.has('yourmove') && (
             <button
-              className={`btn${dimOthers ? ' btn--on' : ''}`}
-              aria-pressed={dimOthers}
+              className="btn"
               onClick={() => {
-                track('yourmove:dim');
-                setDimOthers((d) => !d);
+                track('theme');
+                setTheme((t) => (t === 'light' ? 'dark' : 'light'));
               }}
-              title="Dim cards that aren't your move"
+              title="Toggle light/dark mode"
             >
-              Dim others
+              {theme === 'light' ? '🌙' : '☀️'}
             </button>
-          )}
-          {board.lastError && <span className="sync-error">⚠ {board.lastError}</span>}
-          <span
-            className="sync-meta"
-            title={board.pollWindowActive ? undefined : 'Outside the poll window; Refresh still works'}
-          >
-            {board.lastSync
-              ? `Synced ${new Date(board.lastSync).toLocaleTimeString()}`
-              : 'Never synced'}
-            {!board.pollWindowActive && <span className="sync-window"> · outside poll window</span>}
-          </span>
-          <button className="btn" onClick={refresh} disabled={refreshing || board.syncing}>
-            {refreshing || board.syncing ? 'Syncing…' : 'Refresh'}
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              track('theme');
-              setTheme((t) => (t === 'light' ? 'dark' : 'light'));
-            }}
-            title="Toggle light/dark mode"
-          >
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
+          </div>
         </div>
+        {view === 'board' && ['search', 'sort', 'yourmove'].some((f) => !hidden.has(f)) && (
+          <div className="topbar-tools">
+            {!hidden.has('search') && <SearchBox query={query} onChange={searchFor} hits={searchHits} />}
+            {!hidden.has('sort') && (
+              <label className="sort-control">
+                <span className="sort-label">Sort by</span>
+                <select value={sortKey} onChange={(e) => {
+                    track('sort');
+                    setSortBy(e.target.value);
+                  }}>
+                  <option value="epic">Epic first</option>
+                  <option value="unblock">Epic, then unblocks most</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </label>
+            )}
+            {!hidden.has('yourmove') && (
+              <button
+                className={`btn${dimOthers ? ' btn--on' : ''}`}
+                aria-pressed={dimOthers}
+                onClick={() => {
+                  track('yourmove:dim');
+                  setDimOthers((d) => !d);
+                }}
+                title="Dim cards that aren't your move"
+              >
+                Dim others
+              </button>
+            )}
+          </div>
+        )}
       </header>
       {view === 'board' && (
         <>

@@ -102,10 +102,8 @@ body {
 /* Top bar */
 .topbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -118,41 +116,50 @@ body {
   white-space: nowrap;
 }
 
-.topbar-right {
+/* Row 1: title and tabs on the left, sync status, Refresh and theme pinned right.
+   The status group drops below the tabs only when the row can't hold both. */
+.topbar-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+}
+
+.topbar-status {
+  display: flex;
+  align-items: center;
   gap: 0.5rem 0.75rem;
+  margin-left: auto;
   min-width: 0;
+}
+
+/* Row 2: board-only tools */
+.topbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
 }
 
 .sync-meta {
   white-space: nowrap;
 }
 
-/* Half-screen and narrower: controls drop to their own full-width row */
+/* Half-screen and narrower: search stretches across the tools row */
 @media (max-width: 1100px) {
-  .topbar-right {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
-
-  .topbar-right .search-box {
+  .topbar-tools .search-box {
     flex: 1 1 12rem;
     min-width: 0;
   }
 
-  .topbar-right .search-input {
+  .topbar-tools .search-input {
     flex: 1;
     width: auto;
     min-width: 0;
   }
 
   .sync-error {
-    flex: 1 1 100%;
-    max-width: none;
-    order: 10;
+    max-width: 14rem;
   }
 }
 
@@ -166,9 +173,7 @@ body {
   }
 
   .topbar-left {
-    flex: 1 1 100%;
     flex-wrap: wrap;
-    justify-content: space-between;
     gap: 0.5rem;
   }
 
@@ -177,7 +182,7 @@ body {
     display: none;
   }
 
-  .topbar-right .search-box {
+  .topbar-tools .search-box {
     flex-basis: 100%;
   }
 
