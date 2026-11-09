@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { closeSync, openSync, readdirSync, readSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -24,4 +24,25 @@ export function findReviewNotes() {
     if (m) found.set(`${m[1]}-${m[2].toLowerCase()}`, join(e.parentPath ?? e.path, e.name));
   }
   return found;
+}
+
+/**
+ * The call a saved review opens with: its first line is a bold verdict ("**Approve …**",
+ * "**Request changes …**"). Returns 'approve', 'request-changes' or null.
+ */
+export function noteVerdict(path) {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const buf = Buffer.alloc(200);
+    const n = readSync(fd, buf, 0, buf.length, 0);
+    const head = buf.toString('utf8', 0, n).trimStart().toLowerCase();
+    if (/^\*\*\s*(approve|lgtm)/.test(head)) return 'approve';
+    if (/^\*\*\s*(request changes|changes requested|don't approve|do not approve)/.test(head)) return 'request-changes';
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }

@@ -5,8 +5,11 @@ import ChainsPanel from './components/ChainsPanel.jsx';
 import Column from './components/Column.jsx';
 import LaunchPanel from './components/LaunchPanel.jsx';
 import MergedTray from './components/MergedTray.jsx';
+import PaceBar from './components/PaceBar.jsx';
+import ProgramPanel from './components/ProgramPanel.jsx';
 import ReviewTray from './components/ReviewTray.jsx';
 import SessionsPanel from './components/SessionsPanel.jsx';
+import StagedTray from './components/StagedTray.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
 import YourMoveStrip from './components/YourMoveStrip.jsx';
@@ -257,6 +260,12 @@ const App = () => {
     await load();
   };
 
+  const removeStaged = async (id) => {
+    track('staged:remove');
+    await fetch(`/api/staged/${id}`, { method: 'DELETE' });
+    await load();
+  };
+
   const deleteTodo = async (id) => {
     await fetch(`/api/todos/${id}`, { method: 'DELETE' });
     await load();
@@ -337,6 +346,7 @@ const App = () => {
     onToggleFold: toggleFold,
     dimOthers: dimOthers && !hidden.has('yourmove'),
     flashKey,
+    laneRiskMax: board.laneRiskMax,
   };
 
   const reveal = (key) => {
@@ -357,10 +367,17 @@ const App = () => {
       {requestAction.prompt}
     </button>
   ) : null;
-  // Ready MRs that still need you first, then Drafts.
+  // Ready MRs that still need you first; among them, ones our review already cleared, then the
+  // one waiting longest; Drafts last.
   const forReview = board.cards
     .filter((c) => c.column === 'review' && c.yourReview)
-    .sort((a, b) => (b.yourReview.needsYou ? 1 : 0) - (a.yourReview.needsYou ? 1 : 0) || sortCards(a, b));
+    .sort(
+      (a, b) =>
+        (b.yourReview.needsYou ? 1 : 0) - (a.yourReview.needsYou ? 1 : 0) ||
+        (b.yourReview.noteVerdict === 'approve' ? 1 : 0) - (a.yourReview.noteVerdict === 'approve' ? 1 : 0) ||
+        String(a.yourReview.since ?? '').localeCompare(String(b.yourReview.since ?? '')) ||
+        sortCards(a, b),
+    );
   const merged = board.cards.filter((c) => c.column === 'merged').sort(sortCards);
 
   return (
@@ -390,6 +407,14 @@ const App = () => {
                 onClick={() => showView('chains')}
               >
                 Chains{chains.length > 0 && <span className="view-count">{chains.length}</span>}
+              </button>
+            )}
+            {board.program && (
+              <button
+                className={`view-btn${view === 'program' ? ' view-btn--active' : ''}`}
+                onClick={() => showView('program')}
+              >
+                {board.epicLabel || 'Program'}
               </button>
             )}
             {!hidden.has('time') && (
@@ -458,8 +483,14 @@ const App = () => {
       </header>
       {view === 'board' && (
         <>
+          {board.pace && <PaceBar onOpenProgram={board.program ? () => showView('program') : null} />}
           {!hidden.has('yourmove') && (
-            <YourMoveStrip cards={cards} onReveal={reveal} requestReviews={requestReviews} />
+            <YourMoveStrip
+              cards={cards}
+              onReveal={reveal}
+              requestReviews={requestReviews}
+              reminders={board.reminders ?? []}
+            />
           )}
           <main className="board" ref={boardRef}>
             {board.columns.map((col) => (
@@ -476,6 +507,9 @@ const App = () => {
           {board.reviewTray && !hidden.has('review') && (
             <ReviewTray cards={forReview} showNotes={board.reviewNotes} />
           )}
+          {!hidden.has('staged') && (board.staged?.length ?? 0) > 0 && (
+            <StagedTray staged={board.staged} onRemove={removeStaged} />
+          )}
           {!hidden.has('todos') && (
             <TodoTray
               todos={board.todos ?? []}
@@ -489,6 +523,7 @@ const App = () => {
       )}
       {(view === 'time' || timeVisited) && <TimePanel active={view === 'time'} />}
       {view === 'chains' && <ChainsPanel cards={cards} index={linkIndex} chains={chains} />}
+      {view === 'program' && <ProgramPanel cardByKey={cardByKey} />}
       {view === 'sessions' && (
         <div className="sessions-view">
           <LaunchPanel />

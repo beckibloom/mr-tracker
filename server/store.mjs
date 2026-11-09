@@ -2,7 +2,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'state.json');
+// MRT_STATE_FILE points a second server (a test run) at its own state.
+const FILE =
+  process.env.MRT_STATE_FILE || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'state.json');
 
 export function loadState() {
   try {

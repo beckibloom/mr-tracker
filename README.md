@@ -84,18 +84,152 @@ Every open card carries a turn, worked out on the server (`whoseTurn` in
 | `blocked`  | Merge conflicts, or an open blocker                                                                    |
 | `ci`       | Pipeline running, or in the merge train                                                                |
 | `reviewer` | Waiting for approval                                                                                   |
-| `agent`    | Agent iteration, Draft, anything else                                                                  |
+| `agent`    | Agent iteration, Draft, anything else. Two agent turns carry a reason, because an agent can clear them without asking: a red pipeline whose only failures are known flakes (`MRT_FLAKY_JOBS`), and an approved MR the merge train dropped |
 
-The **Your move** strip above the columns lists every `you` card as one compact row: ref, title
-and what to do ("ask @x to re-approve", "merge or add to train", "answer 2 threads"). ‼ cards
-come first, then the one idle longest. Several Ready to share cards collapse into one row,
-`N ready to share`, which also offers a `request-reviews` quick action when you define one (see
-Claude sessions). Click a ref to scroll to its card, unfolding it if needed; the title opens the
-MR. With nothing to do the strip says "Nothing waiting on you".
+A Your review MR's reason follows your saved review (see Your review tray): "our review says
+approve", "our review asks for changes", or "review, then approve" when there is none for the
+head.
+
+The **Your move** strip above the columns answers "what next", top to bottom:
+
+1. **Next:** the soonest reminder from the program file (see Program tab), with its due date.
+2. Other reminders due within two days.
+3. Every `you` card as one compact row: ref, title and what to do ("ask @x to re-approve",
+   "merge or add to train", "answer 2 threads"). ‼ cards come first, then the one idle longest.
+   Several Ready to share cards collapse into one row, `N ready to share with no reviewer, oldest
+   2d`, which also offers a `request-reviews` quick action when you define one (see Claude
+   sessions).
+4. ‼ cards whose move is someone else's, with who holds it and the flag's reason. A ‼ never
+   leaves the strip just because it waits on a person or CI.
+5. Your MRs whose Chromatic snapshots wait for acceptance.
+6. Later reminders.
+
+Click a ref to scroll to its card, unfolding it if needed; the title opens the MR. With nothing
+to do the strip says "Nothing waiting on you".
 
 Each card shows its turn as a small label next to its ref. **Dim others** in the top bar fades
 every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`
 hides the strip, the labels and the toggle.
+
+## Pace header
+
+For a long migration (removing a package scope from a monorepo, say), set `MRT_PACE_REPO` to a
+local checkout and `MRT_PACE_SCOPE` to the scope, and a bar under the top bar counts the files
+on the main branch that still import it and compares the weekly removal rate with a target
+(`MRT_PACE_TARGET`, default 50):
+
+```
+780 files left (92 vendor) · 32/wk (4-wk avg) · target 50 ▁▂▅▃ below pace · this week 99 · 45/wk meets Mar 12, 2027 · at this rate: Apr 29, 2027
+```
+
+- **Left:** files on `MRT_PACE_REF` (default `origin/main`) with the scope in a module-reference
+  position (`from '…'`, `import '…'`, `import('…')`, `require('…')`), in `.ts .tsx .js .jsx .mjs
+  .cjs` files, skipping `MRT_PACE_EXCLUDE` paths. A file counts once however many packages it
+  imports. `MRT_PACE_SPLIT` paths are counted and also shown on their own.
+- **Rate:** the mean number of files removed per week over the last four whole weeks, Monday to
+  Monday. "Removed" is a set difference (files counted last Monday and not this Monday), so code
+  moved in from elsewhere doesn't hide a week's progress.
+- **Bars:** files removed each week, the dashed line at the target; the hollow bar is this week so
+  far.
+- **Meets / at this rate:** the weekly rate that reaches zero by `MRT_PACE_GOAL_DATE`, and the date
+  the current rate reaches zero. Neither allows for holidays.
+
+The server fetches the ref and recounts at most hourly; **Recount** does it now. `GET /api/pace`
+returns the same numbers for scripts.
+
+## Review lanes
+
+When a review bot can approve small MRs on its own, set `MRT_LANE_PROJECTS` and each card in
+those projects shows its lane:
+
+| Chip                    | Means                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `auto lane · risk 28`   | The bot scored it at or under `MRT_LANE_RISK_MAX` (45): its approval alone can merge it. Before the bot scores it, the lane is predicted from size (≤ `MRT_LANE_MAX_FILES`, 7) and paths (none matching `MRT_LANE_HUMAN_PATHS`). |
+| `human lane · 24 files` | A person must approve.                                                                  |
+| `agent MR → you`        | A review author built it (see Your review tray); your approval is its only review.      |
+
+The risk score is the newest `AI_RISK_VERDICT … score=N` marker in a bot's notes. Two warnings
+say how to make an MR cheaper to review: `9 files · split to ≤ 7?` when it nearly fits, and
+`risk 52 · split?` (or `· needs a person` for one or two files) when it fits by size but scored
+too high. `MRT_HIDE=lanes` hides the chips.
+
+## Waits, Chromatic and CI noise
+
+- `ready · no reviewer · 3d` on Ready to share cards and `waiting · 4d` on Waiting for approval
+  cards turn orange at two days. The clock starts at the clean agent review or the newest review
+  request, so a fresh server shows real ages.
+- `Chromatic waiting · 21h` on MRs in `MRT_CHROMATIC_PROJECTS` whose head still has a pending
+  `MRT_CHROMATIC_STATUS` commit status (default `UI Tests`) half an hour after it was posted.
+  Orange after a day.
+- `train drop · 2h` when the latest "removed this merge request from the merge train" note is newer
+  than the latest add, and `flake · e2e` when every failed job on a red pipeline matches
+  `MRT_FLAKY_JOBS`. Both make the card an agent turn.
+
+`MRT_HIDE=aging` hides the age and Chromatic chips.
+
+## Program tab
+
+`MRT_PROGRAM_FILE` names a JSON file you keep by hand with the plan of a migration. The tab,
+labelled `FOCUSED_EPIC_LABEL`, shows:
+
+- **Gap queue:** tickets that gate families, most files first, with live Jira status, days since
+  the ticket last changed (red past `gapIdleDays`), and which of four hand-off conditions for an
+  agent are missing: open sprint, To Do, assigned to you, `MRT_AI_READY_LABEL` plus a
+  `MRT_REPO_LABEL_PREFIX` label.
+- **Families:** files left per family (from the pace census), files removed in four weeks, the
+  family's MRs on the board with their lane, merges in the last week, owner, forecast date (and
+  the date with a faster lane), and its gate. `serial` flags an ungated family with files left and
+  at most one MR open. Packages no family lists show as one extra row, "Not in the plan".
+
+The file's `reminders` feed the Your move strip. A reminder with `mr` (a card key) is done once
+that MR merges; one with `done: true` is hidden. `GET /api/program` returns the whole view.
+
+```json
+{
+  "title": "Remove legacy-ui",
+  "updated": "2026-11-09",
+  "gapIdleDays": 7,
+  "projects": ["group/web-app"],
+  "families": [
+    {
+      "id": "tooltip",
+      "name": "tooltip",
+      "packages": ["legacy-ui-tooltip"],
+      "match": "tooltip",
+      "tickets": ["WEB-120"],
+      "mrs": ["group/web-app!412"],
+      "owner": "A",
+      "forecast": "2026-12-04",
+      "withLane": "2026-11-20",
+      "gate": "ready",
+      "note": "Then one lint-ban MR."
+    }
+  ],
+  "gaps": [{ "key": "UI-31", "files": 41, "family": "dropdown", "note": "async search" }],
+  "reminders": [{ "text": "Design decisions", "due": "2026-11-20", "unblocks": 137, "link": "…", "mr": null }]
+}
+```
+
+A card joins the first family (in file order) whose `mrs`, `tickets` or `match` (a
+case-insensitive regex over title and branch) it hits. With a focused epic, only the epic's cards
+join; `projects` limits them to the migrated repos. `MRT_HIDE=program` hides the tab and the
+reminders.
+
+## Staged tray
+
+Work that depends on an unmerged MR can be built locally and parked, then opened from fresh main
+the day its blocker merges. An agent registers the branch:
+
+```bash
+curl -s -X POST localhost:4178/api/staged -H 'Content-Type: application/json' -d '{
+  "repo": "/Users/me/dev/web-app", "branch": "chore/wave-1",
+  "blockedBy": "group/web-app!412", "title": "Wave 1", "by": "agent" }'
+```
+
+The **Staged** tray lists each branch with its blocker's state: `waiting on its blocker`,
+`blocker merged · open it now` (sorted first), or `branch is gone`. The entry leaves the tray once
+an MR from that branch shows on the board; × removes it by hand. `GET /api/staged` lists them,
+`DELETE /api/staged/:id` removes one. The tray shows only while something is staged.
 
 ## Blocked cards fold under their blocker
 
@@ -240,12 +374,15 @@ the tray off). Every open MR they authored where you are the assignee or a revie
 **Your review** tray under the board instead of a column, so nothing shows twice. Your own MRs
 are unaffected, and the tray finds reviewer-only MRs whatever `MRT_MR_SCOPE` says.
 
-Each row shows the pipeline dot, the ref and title (both link to the MR), Draft or ready, the
+Each row shows the pipeline dot, the ref and title (both link to the MR), Draft or ready, how
+long it has waited on you (since its newest push or un-drafting), its file count, the
 pipeline status, the author's own AI review verdict and issue count (the same format as
 `MRT_BOT_USERS` reviews), and whether you have approved. Set `MRT_REVIEW_NOTES_DIR` to a folder
 where you save your own reviews as `mr-review-<iid>-<sha8>.md` (any depth), and each row also
-says whether your review exists for the current head: `our review: saved` opens the file, `our
-review: not yet` means no file matches the head sha. Unset, that chip is hidden.
+says whether your review exists for the current head: `our review: approve` or `our review:
+changes` (read from the file's bold first line) opens the file, `our review: not yet` means no
+file matches the head sha. Unset, that chip is hidden. The toggle shows the oldest wait, and
+ready MRs your review already cleared sort first.
 
 An MR needs you when it is ready (not Draft) and you haven't approved its current head. A push
 after your approval counts as unapproved even when GitLab keeps the approval, and the row then
@@ -261,7 +398,9 @@ actions, the cheat sheet) in `data/usage.json`, which never leaves your machine.
 spot what you never touch.
 
 Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
-`sessions`, `chains`, `time` (tabs), `search`, `sort`, `yourmove` (strip, turn labels, Dim others), `todos`, `merged`, `review` (trays), and the card
+`sessions`, `chains`, `time`, `program` (tabs), `pace` (header), `search`, `sort`, `yourmove`
+(strip, turn labels, Dim others), `todos`, `merged`, `review`, `staged` (trays), the chips
+`lanes` and `aging`, and the card
 tools `important`, `review-request`, `claude`, `links`, `notes`.
 
 ## Setup
@@ -314,6 +453,18 @@ The rest:
 | `MRT_REVIEW_NOTES_DIR` | — | Where you save your own reviews as `mr-review-<iid>-<sha8>.md`, at any depth. Set it to show the "our review" chip in the Your review tray. |
 | `MRT_DEFAULT_SORT` | `epic` | The sort until you pick one in the top bar: `epic`, `unblock` (‼, then the focused epic, then cards that unblock the most open MRs, then idle longest), `newest` or `oldest`. |
 | `MRT_HIDE` | — | Comma-separated features to hide, e.g. `chains,time,todos` (see Feature usage and hiding). |
+| `MRT_PACE_REPO`, `MRT_PACE_SCOPE` | — | Local checkout and package scope the pace header counts. Both are needed; either empty turns it off. |
+| `MRT_PACE_REF`, `MRT_PACE_EXCLUDE` | `origin/main`, — | Ref counted; comma-separated path prefixes skipped. |
+| `MRT_PACE_SPLIT`, `MRT_PACE_SPLIT_LABEL` | — | A path prefix counted and also shown on its own, and its label. |
+| `MRT_PACE_TARGET`, `MRT_PACE_GOAL_DATE`, `MRT_PACE_LABEL` | `50`, —, `files` | Weekly target, the date the plan promises, and the header's noun. |
+| `MRT_LANE_PROJECTS` | — | Projects whose cards show a review-lane chip. |
+| `MRT_LANE_MAX_FILES`, `MRT_LANE_RISK_MAX`, `MRT_LANE_HUMAN_PATHS` | `7`, `45`, — | Auto-lane size, the risk score the bot approves at, and paths that always need a person (regex). |
+| `MRT_FLAKY_JOBS` | — | Regex of job names known to flake. |
+| `MRT_CHROMATIC_PROJECTS`, `MRT_CHROMATIC_STATUS` | —, `UI Tests` | Projects checked for a pending Chromatic commit status, and its name. |
+| `MRT_PROGRAM_FILE` | — | The plan file behind the Program tab and the strip's reminders. |
+| `MRT_AI_READY_LABEL`, `MRT_REPO_LABEL_PREFIX` | `ai-ready`, `repo:` | Labels a gap ticket needs before an agent can take it. |
+| `FOCUSED_EPIC_JQL_LABELS` | — | Labels whose tickets count as epic members alongside the epic's children. |
+| `MRT_STATE_FILE` | `data/state.json` | Where the board keeps its state; point a second (test) server elsewhere. |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
 

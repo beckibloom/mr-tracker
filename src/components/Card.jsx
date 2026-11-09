@@ -36,6 +36,93 @@ const agentChip = (review, column) => {
   return <span className="chip chip--warn">agent: {label}</span>;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ageMs = (iso) => (iso ? Date.now() - new Date(iso).getTime() : 0);
+
+// Review lane (server/gitlab.mjs laneInfo): who can approve it, and how to make it cheaper.
+const LANE_TEXT = { auto: 'auto lane', agent: 'agent MR → you', human: 'human lane' };
+const laneChip = (card, laneRiskMax) => {
+  const l = card.lane;
+  if (!l || card.postMerge) return null;
+  const parts = [LANE_TEXT[l.lane] ?? l.lane];
+  if (l.risk && !l.warn?.startsWith('risk')) parts.push(`risk ${l.risk.score}`);
+  else if (l.files != null) parts.push(`${l.files} file${l.files === 1 ? '' : 's'}`);
+  const tone = l.warn ? 'warn' : l.lane === 'auto' && l.autoApprovable ? 'good' : 'muted';
+  const title = [
+    l.lane === 'auto'
+      ? l.predicted
+        ? `Predicted auto lane: ${l.files} files and no human-only paths, so the review bot can approve it alone if it scores ≤ ${laneRiskMax}.`
+        : `The review bot scored it ≤ ${laneRiskMax}, so its approval alone can merge it.`
+      : l.lane === 'agent'
+        ? 'Built by a review author; your approval is its only review.'
+        : 'Needs a person to approve.',
+    l.files != null ? `${l.files} files changed.` : null,
+    l.risk ? `Risk ${l.risk.score}${l.risk.threshold ? ` (threshold ${l.risk.threshold})` : ''}, ${l.risk.verdict}.` : 'No risk score yet.',
+    l.humanPaths?.length ? `Human-only paths: ${l.humanPaths.join(', ')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return (
+    <span key="lane" className={`chip chip--lane chip--${tone}`} title={title}>
+      {parts.join(' · ')}
+      {l.warn && <strong> · {l.warn}</strong>}
+    </span>
+  );
+};
+
+// How long a card has sat in Ready to share or Waiting for approval; loud from two days.
+const ageChip = (card) => {
+  if (!card.columnSince || card.state !== 'opened') return null;
+  const age = ageMs(card.columnSince);
+  const label = card.column === 'ready-human' ? 'ready · no reviewer' : 'waiting';
+  return (
+    <span
+      className={`chip ${age >= 2 * DAY_MS ? 'chip--warn' : 'chip--muted'}`}
+      title={`${card.column === 'ready-human' ? 'Ready to share' : 'Waiting for approval'} since ${new Date(card.columnSince).toLocaleString()}`}
+    >
+      {label} · {relTime(card.columnSince)}
+    </span>
+  );
+};
+
+const chromaticChip = (card) =>
+  card.chromatic ? (
+    <a
+      className={`chip ${ageMs(card.chromatic.since) >= DAY_MS ? 'chip--warn' : 'chip--muted'}`}
+      href={card.chromatic.url ?? card.webUrl}
+      target="_blank"
+      rel="noreferrer"
+      title={`Chromatic snapshots wait for acceptance${card.chromatic.description ? `: ${card.chromatic.description}` : ''}`}
+      {...stopDrag}
+    >
+      Chromatic waiting · {relTime(card.chromatic.since)}
+    </a>
+  ) : null;
+
+// CI noise an agent clears without asking: a merge-train drop, or only known-flaky jobs red.
+const ciNoiseChip = (card) => {
+  if (card.state !== 'opened') return null;
+  const flaky = card.pipeline?.color === 'red' && card.failedJobs?.allFlaky;
+  if (card.trainDrop) {
+    return (
+      <span
+        className="chip chip--warn"
+        title={`Dropped from the merge train ${new Date(card.trainDrop.at).toLocaleString()}${card.trainDrop.reason ? `: ${card.trainDrop.reason}` : ''}. An agent retries the flake and re-adds it.`}
+      >
+        train drop · {relTime(card.trainDrop.at)}
+      </span>
+    );
+  }
+  if (flaky) {
+    return (
+      <span className="chip chip--warn" title="Only known-flaky jobs failed. An agent retries them.">
+        flake · {card.failedJobs.names.join(', ')}
+      </span>
+    );
+  }
+  return null;
+};
+
 // Short labels for whose move a card waits on (server/classify.mjs whoseTurn).
 const TURN_TEXT = {
   you: 'your move',
@@ -495,6 +582,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
     hidden = new Set(),
     dimOthers = false,
     flashKey = null,
+    laneRiskMax = 45,
   } = useContext(BoardContext);
   const showTurn = !hidden.has('yourmove') && Boolean(card.turn);
   const session = card.claudeSession;
@@ -619,7 +707,11 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
         {showTurn && (
           <span
             className={`turn-label turn-label--${card.turn}`}
-            title={card.turnReason ? `Your move: ${card.turnReason}` : `Waiting on: ${TURN_TEXT[card.turn]}`}
+            title={
+              card.turnReason
+                ? `Your move: ${card.turnReason}`
+                : `Waiting on: ${TURN_TEXT[card.turn]}${card.agentReason ? ` (${card.agentReason})` : ''}`
+            }
           >
             {TURN_TEXT[card.turn]}
           </span>
@@ -676,6 +768,10 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
             </a>
           ))}
         {!card.postMerge && agentChip(card.agentReview, card.column)}
+        {!hidden.has('lanes') && laneChip(card, laneRiskMax)}
+        {!hidden.has('aging') && ageChip(card)}
+        {!hidden.has('aging') && chromaticChip(card)}
+        {ciNoiseChip(card)}
         {card.approvalsMet && !APPROVED_IMPLIED.has(card.column) && (
           <span className="chip chip--good">approved</span>
         )}

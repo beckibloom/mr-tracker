@@ -33,6 +33,14 @@ const approvalChip = (r) => {
   return <span className="chip chip--muted">not approved</span>;
 };
 
+const waitText = (iso) => {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 60) return `${m}m`;
+  return m < 24 * 60 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`;
+};
+
+const VERDICT_TEXT = { approve: 'our review: approve', 'request-changes': 'our review: changes' };
+
 /** MRs a review author built for you to approve; a red dot while any is ready and unapproved. */
 const ReviewTray = ({ cards, showNotes }) => {
   const [open, setOpen] = useState(false);
@@ -40,6 +48,10 @@ const ReviewTray = ({ cards, showNotes }) => {
   const revealed = !open && cards.some((c) => searchSet?.has(c.key));
   const shown = open || revealed;
   const needs = cards.filter((c) => c.yourReview?.needsYou).length;
+  const oldest = cards
+    .filter((c) => c.yourReview?.needsYou && c.yourReview.since)
+    .map((c) => c.yourReview.since)
+    .sort()[0];
 
   return (
     <aside className={`merged-tray review-tray${shown ? ' merged-tray--open' : ''}`}>
@@ -50,7 +62,8 @@ const ReviewTray = ({ cards, showNotes }) => {
           setOpen((o) => !o);
         }}
       >
-        Your review ({cards.length}) <NeedsDot count={needs} /> {shown ? '▾' : '▸'}
+        Your review ({cards.length}) <NeedsDot count={needs} />
+        {oldest && <span className="review-oldest"> oldest waits {waitText(oldest)}</span>} {shown ? '▾' : '▸'}
       </button>
       {shown && (
         <div className="review-body">
@@ -92,6 +105,14 @@ const ReviewTray = ({ cards, showNotes }) => {
                     <span className={`chip ${card.draft ? 'chip--muted' : 'chip--warn'}`}>
                       {card.draft ? 'Draft' : 'ready'}
                     </span>
+                    {r.needsYou && r.since && (
+                      <span className="chip chip--muted" title={`Waiting on you since ${new Date(r.since).toLocaleString()}`}>
+                        waiting {waitText(r.since)}
+                      </span>
+                    )}
+                    {card.lane?.files != null && (
+                      <span className="chip chip--muted">{card.lane.files} files</span>
+                    )}
                     {card.pipeline.url ? (
                       <a
                         className="review-pipeline"
@@ -114,14 +135,14 @@ const ReviewTray = ({ cards, showNotes }) => {
                     {showNotes &&
                       (r.notePath ? (
                         <a
-                          className="chip chip--good review-note"
+                          className={`chip ${r.noteVerdict === 'request-changes' ? 'chip--warn' : 'chip--good'} review-note`}
                           href={`/api/review-note?key=${encodeURIComponent(card.key)}`}
                           target="_blank"
                           rel="noreferrer"
                           title={r.notePath}
                           onClick={() => track('review:note')}
                         >
-                          our review: saved
+                          {VERDICT_TEXT[r.noteVerdict] ?? 'our review: saved'}
                         </a>
                       ) : (
                         <span

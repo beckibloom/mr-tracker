@@ -196,6 +196,50 @@ export function resolveEpicByJira(key, members) {
   return promise;
 }
 
+// Children of the epic, plus anything carrying one of FOCUSED_EPIC_JQL_LABELS (tickets filed under
+// another parent but labelled for the epic's program). Empty labels: children only.
+const EPIC_JQL_LABELS = (process.env.FOCUSED_EPIC_JQL_LABELS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function epicMembersJql() {
+  const labels = EPIC_JQL_LABELS.map((l) => `"${l.replace(/"/g, '')}"`).join(', ');
+  return labels ? `parent = ${EPIC_KEY} OR labels in (${labels})` : `parent = ${EPIC_KEY}`;
+}
+
+/** Jira issues by key with the given fields; [] without credentials or on error. */
+export async function getIssues(keys, fields) {
+  if (!hasJiraWrite() || keys.length === 0) return [];
+  const url = new URL(`${JIRA_BASE}/rest/api/3/search/jql`);
+  url.searchParams.set('jql', `key in (${keys.join(',')})`);
+  url.searchParams.set('fields', fields.join(','));
+  url.searchParams.set('maxResults', '100');
+  const data = await jiraGet(url);
+  return data.issues ?? [];
+}
+
+/** The subset of `keys` that sit in an open sprint. */
+export async function keysInOpenSprint(keys) {
+  if (!hasJiraWrite() || keys.length === 0) return new Set();
+  const url = new URL(`${JIRA_BASE}/rest/api/3/search/jql`);
+  url.searchParams.set('jql', `key in (${keys.join(',')}) AND sprint in openSprints()`);
+  url.searchParams.set('fields', 'key');
+  url.searchParams.set('maxResults', '100');
+  const data = await jiraGet(url);
+  return new Set((data.issues ?? []).map((i) => i.key));
+}
+
+let myself = null;
+/** The Jira user behind JIRA_EMAIL, fetched once. */
+export function jiraMyself() {
+  myself ??= jiraGet(`${JIRA_BASE}/rest/api/3/myself`).catch((err) => {
+    myself = null;
+    throw err;
+  });
+  return myself;
+}
+
 let epicMembers = null;
 let epicFetchedAt = 0;
 
@@ -217,7 +261,7 @@ export async function getEpicMembers() {
     let pageToken = '';
     do {
       const url = new URL(`${JIRA_BASE}/rest/api/3/search/jql`);
-      url.searchParams.set('jql', `parent = ${EPIC_KEY}`);
+      url.searchParams.set('jql', epicMembersJql());
       url.searchParams.set('fields', 'key');
       url.searchParams.set('maxResults', '200');
       if (pageToken) url.searchParams.set('nextPageToken', pageToken);

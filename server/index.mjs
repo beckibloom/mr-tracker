@@ -18,10 +18,19 @@ import {
   sessionStatus,
 } from './claude.mjs';
 import { classify, COLUMNS, whoseTurn } from './classify.mjs';
-import { assertToken, fetchMergedCards, fetchOpenCards, REVIEW_AUTHORS } from './gitlab.mjs';
+import {
+  assertToken,
+  fetchMergedCards,
+  fetchOpenCards,
+  getMergeRequest,
+  LANE_RISK_MAX,
+  REVIEW_AUTHORS,
+} from './gitlab.mjs';
 import { addWorklog, getLoggedTime, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
 import { REVIEW_NOTES_DIR } from './review-notes.mjs';
+import { getPace, PACE_ENABLED } from './pace.mjs';
+import { activeReminders, buildProgram, loadProgram } from './program.mjs';
 import { record, report } from './usage.mjs';
 
 // MRT_LINK_BROWSER="Google Chrome" opens the board's links in that app (useful when the board runs
@@ -66,6 +75,8 @@ state.dismissed ??= {};
 state.claudeSessions ??= {};
 state.launcherSessions ??= [];
 state.pendingLaunches ??= [];
+state.since ??= {};
+state.staged ??= [];
 const LINK_TYPES = new Set(['blocked-by', 'follows']);
 let syncing = false;
 
@@ -79,6 +90,8 @@ async function sync() {
     for (const card of [...open, ...merged]) cards[card.key] = card;
     resolveMentions(cards);
     reclassify(cards);
+    trackSince(cards);
+    await refreshStaged(cards);
     // Drop a manual override once the MR's real state moves it somewhere new.
     for (const [key, o] of Object.entries(state.overrides)) {
       if (
@@ -110,6 +123,71 @@ async function sync() {
     saveState(state);
     syncing = false;
   }
+}
+
+// Columns whose waits get a visible age: ready to share and waiting for approval.
+const AGED_COLUMNS = new Set(['ready-human', 'waiting-approval']);
+
+/**
+ * When each open card entered the column it shows in, for the ready and waiting ages. A card
+ * first seen there starts from what GitLab knows: its clean agent review for Ready to share, its
+ * newest review request for Waiting for approval.
+ */
+function trackSince(cards) {
+  const next = {};
+  for (const card of Object.values(cards)) {
+    if (card.state !== 'opened') continue;
+    const column = state.overrides[card.key]?.column ?? card.autoColumn;
+    if (!AGED_COLUMNS.has(column)) continue;
+    const prev = state.since[card.key];
+    if (prev?.column === column) next[card.key] = prev;
+    else {
+      const seed = column === 'ready-human' ? card.agentReview?.at : card.reviewRequestedAt;
+      next[card.key] = { column, at: seed ?? new Date().toISOString() };
+    }
+  }
+  state.since = next;
+}
+
+/** Staged branches: work built on an open MR's diff, waiting for that MR to merge. */
+const git = (cwd, args) =>
+  new Promise((resolve) =>
+    execFile('git', ['-C', cwd, ...args], (err, stdout) => resolve(err ? null : stdout.trim())),
+  );
+
+async function refreshStaged(cards) {
+  const byBranch = new Map(
+    Object.values(cards)
+      .filter((c) => c.state === 'opened' && c.branch)
+      .map((c) => [c.branch, c]),
+  );
+  const kept = [];
+  for (const s of state.staged) {
+    // Opened as an MR: it's a card now, so the staged entry has done its job.
+    if (byBranch.has(s.branch)) continue;
+    const exists = s.repo ? (await git(s.repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${s.branch}`])) !== null : null;
+    let blocker = cards[s.blockedBy] ?? null;
+    let blockerState = blocker?.state ?? null;
+    if (!blocker && s.blockedBy?.includes('!')) {
+      const [project, iid] = s.blockedBy.split('!');
+      try {
+        const mr = await getMergeRequest(project, iid);
+        blockerState = mr.state;
+        blocker = { key: s.blockedBy, title: mr.title, webUrl: mr.web_url, state: mr.state };
+      } catch {
+        blockerState = s.blockerState ?? null;
+      }
+    }
+    kept.push({
+      ...s,
+      branchExists: exists,
+      blockerState,
+      blockerTitle: blocker?.title ?? s.blockerTitle ?? null,
+      blockerUrl: blocker?.webUrl ?? s.blockerUrl ?? null,
+      status: exists === false ? 'missing-branch' : blockerState === 'merged' ? 'ready-to-open' : 'waiting',
+    });
+  }
+  state.staged = kept;
 }
 
 // At most this many MRs carry the ‼ flag at once.
@@ -225,6 +303,7 @@ app.get('/api/board', (_req, res) => {
       ...card,
       column,
       ...whoseTurn(card, column),
+      columnSince: state.since[card.key]?.column === column ? state.since[card.key].at : null,
       overridden: Boolean(state.overrides[card.key]),
       note: state.notes[card.key] ?? '',
       important: Boolean(state.important[card.key]),
@@ -250,7 +329,73 @@ app.get('/api/board', (_req, res) => {
     reviewNotes: Boolean(REVIEW_NOTES_DIR),
     defaultSort: DEFAULT_SORT,
     linkBrowser: Boolean(LINK_BROWSER),
+    laneRiskMax: LANE_RISK_MAX,
+    reminders: HIDDEN.includes('program') ? [] : activeReminders(undefined, state.cards),
+    staged: state.staged,
+    pace: PACE_ENABLED && !HIDDEN.includes('pace'),
+    program: Boolean(loadProgram()) && !HIDDEN.includes('program'),
   });
+});
+
+// Migration pace (README "Pace header"). ?fresh=1 fetches and recounts now.
+app.get('/api/pace', async (req, res) => {
+  try {
+    res.json(await getPace({ fresh: req.query.fresh === '1' }));
+  } catch (err) {
+    res.status(500).json({ enabled: true, error: String(err.message ?? err) });
+  }
+});
+
+// The program tab: families, gap queue, reminders (README "Program tab").
+app.get('/api/program', async (_req, res) => {
+  try {
+    const pace = PACE_ENABLED ? await getPace().catch(() => null) : null;
+    // With a focused epic, only its cards join families; without one, every card can.
+    const epicKey = process.env.FOCUSED_EPIC_KEY ?? '';
+    const cards = Object.values(state.cards).filter((c) => !epicKey || c.epic);
+    res.json({ ...(await buildProgram(cards, pace)), pace });
+  } catch (err) {
+    res.status(500).json({ enabled: true, error: String(err.message ?? err) });
+  }
+});
+
+// Staged branches (README "Staged tray"). Body: { repo, branch, blockedBy, title?, ticket?, by? }.
+// `blockedBy` is a card key ("group/project!123"). The entry leaves the tray once an MR from the
+// branch shows on the board.
+app.get('/api/staged', (_req, res) => res.json(state.staged));
+
+app.post('/api/staged', async (req, res) => {
+  const text = (v, max) => String(v ?? '').trim().slice(0, max) || null;
+  const branch = text(req.body?.branch, 200);
+  const blockedBy = text(req.body?.blockedBy, 200);
+  const repo = text(req.body?.repo, 400);
+  if (!branch || !blockedBy || !repo) {
+    return res.status(400).json({ error: 'repo, branch and blockedBy are required.' });
+  }
+  if (!/^[\w.-]+(\/[\w.-]+)+![0-9]+$/.test(blockedBy)) {
+    return res.status(400).json({ error: 'blockedBy must be a full MR key, e.g. group/project!123.' });
+  }
+  state.staged = state.staged.filter((s) => s.branch !== branch || s.repo !== repo);
+  const entry = {
+    id: randomUUID(),
+    repo,
+    branch,
+    blockedBy,
+    title: text(req.body?.title, 200),
+    ticket: text(req.body?.ticket, 40),
+    by: text(req.body?.by, 60),
+    createdAt: new Date().toISOString(),
+  };
+  state.staged.push(entry);
+  await refreshStaged(state.cards);
+  saveState(state);
+  res.json(state.staged.find((s) => s.id === entry.id) ?? entry);
+});
+
+app.delete('/api/staged/:id', (req, res) => {
+  state.staged = state.staged.filter((s) => s.id !== req.params.id);
+  saveState(state);
+  res.json({ ok: true });
 });
 
 // Your saved review for a tray MR, as plain text. Only paths found by the notes scan are served.
@@ -407,6 +552,19 @@ function cardBrief(card, userPrompt) {
     );
   } else if (card.state !== 'merged') {
     lines.push('- AI review: none yet');
+  }
+  if (card.lane) {
+    const l = card.lane;
+    lines.push(
+      `- Review lane: ${l.lane}${l.files != null ? `, ${l.files} files` : ''}` +
+        (l.risk ? `, risk ${l.risk.score} (auto-approve at ≤ ${LANE_RISK_MAX})` : '') +
+        (l.humanPaths?.length ? `, human-only paths: ${l.humanPaths.join(', ')}` : '') +
+        (l.warn ? ` — ${l.warn}` : ''),
+    );
+  }
+  if (card.trainDrop) lines.push(`- Dropped from the merge train ${card.trainDrop.at}${card.trainDrop.reason ? `: ${card.trainDrop.reason}` : ''}`);
+  if (card.failedJobs?.names?.length) {
+    lines.push(`- Failed jobs: ${card.failedJobs.names.join(', ')}${card.failedJobs.allFlaky ? ' (all known flakes)' : ''}`);
   }
   if (card.approvalsMet) lines.push('- Approvals: met');
   if (card.unresolvedHumanThreads > 0) {

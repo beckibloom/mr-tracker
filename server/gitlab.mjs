@@ -84,6 +84,11 @@ async function listReviewMergeRequests(params, username) {
   return [...seen.values()];
 }
 
+/** One MR by project path and iid, as GitLab returns it. */
+export function getMergeRequest(project, iid) {
+  return gl(`/projects/${encodeURIComponent(project)}/merge_requests/${iid}`);
+}
+
 export async function glAll(path, params = {}) {
   const all = [];
   for (let page = 1; page <= 10; page++) {
@@ -106,7 +111,7 @@ function parseAgentReview(discussions) {
       if (!latest || n.created_at > latest.created_at) latest = n;
     }
   }
-  if (!latest) return { reviewed: false, clean: false, issueCount: null, verdict: null };
+  if (!latest) return { reviewed: false, clean: false, issueCount: null, verdict: null, at: null };
 
   const counts = latest.body.match(/AI_REVIEW_COUNTS critical=(\d+) major=(\d+) minor=(\d+)/);
   const issueCount = counts ? Number(counts[1]) + Number(counts[2]) + Number(counts[3]) : null;
@@ -114,7 +119,31 @@ function parseAgentReview(discussions) {
   const verdict = assessment ? assessment[1].trim().toUpperCase() : null;
   // "Any issues at all (even minor)" keeps the MR in agent iteration.
   const clean = issueCount === 0 && (verdict === null || verdict.startsWith('APPROVE'));
-  return { reviewed: true, clean, issueCount, verdict };
+  return { reviewed: true, clean, issueCount, verdict, at: latest.created_at };
+}
+
+/**
+ * The latest risk verdict a review bot posted (`<!-- AI_RISK_VERDICT verdict=… score=N
+ * threshold=N -->`), or null. The score decides whether the bot can approve on its own.
+ */
+function parseRisk(discussions) {
+  let latest = null;
+  for (const d of discussions) {
+    for (const n of d.notes ?? []) {
+      const author = n.author?.username ?? '';
+      if (!isBot(author) && !REVIEW_AUTHORS.has(author)) continue;
+      const m = n.body?.match(/AI_RISK_VERDICT verdict=([\w-]+) score=(\d+)(?: threshold=(\d+))?/);
+      if (m && (!latest || n.created_at > latest.at)) {
+        latest = {
+          verdict: m[1],
+          score: Number(m[2]),
+          threshold: m[3] ? Number(m[3]) : null,
+          at: n.created_at,
+        };
+      }
+    }
+  }
+  return latest;
 }
 
 /**
@@ -148,6 +177,140 @@ const latestSystemNote = (discussions, test) =>
     .filter((n) => n.system && test(n))
     .reduce((at, n) => (!at || n.created_at > at ? n.created_at : at), null);
 
+const csv = (v) =>
+  String(v ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+// Review lanes (see README "Review lanes"). Projects where a review bot can approve small MRs on
+// its own; empty turns lane chips off.
+const LANE_PROJECTS = new Set(csv(process.env.MRT_LANE_PROJECTS ?? ''));
+const LANE_MAX_FILES = Number(process.env.MRT_LANE_MAX_FILES ?? 7);
+export const LANE_RISK_MAX = Number(process.env.MRT_LANE_RISK_MAX ?? 45);
+// Paths that always need a person, whatever the size.
+const LANE_HUMAN_PATHS = process.env.MRT_LANE_HUMAN_PATHS ?? '';
+const LANE_HUMAN_RE = LANE_HUMAN_PATHS ? new RegExp(LANE_HUMAN_PATHS) : null;
+
+// Failed jobs known to flake: a red pipeline whose only failures match is an agent's retry.
+const FLAKY_JOBS = process.env.MRT_FLAKY_JOBS ?? '';
+const FLAKY_RE = FLAKY_JOBS ? new RegExp(FLAKY_JOBS) : null;
+
+// Chromatic's commit status; pending on the head sha means snapshots wait for acceptance.
+const CHROMATIC_PROJECTS = new Set(
+  csv(process.env.MRT_CHROMATIC_PROJECTS ?? ''),
+);
+const CHROMATIC_STATUS = process.env.MRT_CHROMATIC_STATUS ?? 'UI Tests';
+// A build still capturing reads the same as one waiting for acceptance; give it this long.
+const CHROMATIC_GRACE_MS = 30 * 60 * 1000;
+
+const diffCache = new Map(); // `${key}@${sha}` -> paths
+async function changedPaths(pid, iid, key, sha) {
+  const cacheKey = `${key}@${sha}`;
+  if (!diffCache.has(cacheKey)) {
+    diffCache.set(
+      cacheKey,
+      glAll(`/projects/${pid}/merge_requests/${iid}/diffs`)
+        .then((diffs) => [...new Set(diffs.flatMap((d) => [d.new_path, d.old_path]).filter(Boolean))])
+        .catch((err) => {
+          diffCache.delete(cacheKey);
+          throw err;
+        }),
+    );
+  }
+  return diffCache.get(cacheKey);
+}
+
+/**
+ * Which review lane an open MR is in: `agent` (a review author built it; you approve),
+ * `auto` (small and off the human-only paths, so the bot may approve it alone) or `human`.
+ * `warn` says how to get an MR of yours into the auto lane when it nearly fits.
+ */
+async function laneInfo({ mr, detail, discussions, key, project }) {
+  if (REVIEW_AUTHORS.has(mr.author?.username)) {
+    return { lane: 'agent', files: Number.parseInt(detail.changes_count, 10) || null, risk: parseRisk(discussions) };
+  }
+  if (!LANE_PROJECTS.has(project)) return null;
+  const sha = detail.sha ?? mr.sha ?? '';
+  const paths = await changedPaths(mr.project_id, mr.iid, key, sha).catch(() => null);
+  const files = paths?.length ?? (Number.parseInt(detail.changes_count, 10) || null);
+  const humanPaths = (paths ?? []).filter((p) => LANE_HUMAN_RE?.test(p));
+  const risk = parseRisk(discussions);
+  // Before the bot scores the MR, size and paths predict its lane; after, its score decides.
+  const fits = files != null && files <= LANE_MAX_FILES && humanPaths.length === 0;
+  const autoByRisk = risk ? risk.score <= LANE_RISK_MAX : null;
+  const lane = (autoByRisk ?? fits) ? 'auto' : 'human';
+  let warn = null;
+  const nearlyFits = files != null && files > LANE_MAX_FILES && files <= LANE_MAX_FILES * 2;
+  if (lane === 'human' && nearlyFits && humanPaths.length === 0) {
+    // Splitting it would likely move it to the auto lane. Far bigger MRs are human by design.
+    warn = `${files} files · split to ≤ ${LANE_MAX_FILES}?`;
+  } else if (risk && !autoByRisk && files != null && files <= LANE_MAX_FILES) {
+    warn = files > 2 ? `risk ${risk.score} · split?` : `risk ${risk.score} · needs a person`;
+  }
+  return {
+    lane,
+    predicted: !risk,
+    files,
+    maxFiles: LANE_MAX_FILES,
+    humanPaths: humanPaths.slice(0, 5),
+    risk,
+    autoApprovable: autoByRisk === true,
+    warn,
+  };
+}
+
+/**
+ * Dropped from the merge train and not back in it: the latest "removed … from the merge train"
+ * note is newer than the latest add. `addedBy` is who put it in the train last.
+ */
+function trainDrop(discussions, inTrain) {
+  if (inTrain) return null;
+  const notes = discussions.flatMap((d) => d.notes ?? []).filter((n) => n.system);
+  let added = null;
+  let removed = null;
+  for (const n of notes) {
+    const body = n.body ?? '';
+    if (/(added this merge request to the merge train|started a merge train)/i.test(body)) {
+      if (!added || n.created_at > added.created_at) added = n;
+    } else if (/removed this merge request from the merge train/i.test(body)) {
+      if (!removed || n.created_at > removed.created_at) removed = n;
+    }
+  }
+  if (!removed || (added && added.created_at > removed.created_at)) return null;
+  const reason = (removed.body.match(/because (.+)$/is)?.[1] ?? '').trim().slice(0, 200) || null;
+  return { at: removed.created_at, reason, addedBy: added?.author?.username ?? null };
+}
+
+/** Failed, blocking jobs on a red pipeline, and whether every one of them is a known flake. */
+async function failedJobs(projectId, pipelineId) {
+  const jobs = await glAll(`/projects/${projectId}/pipelines/${pipelineId}/jobs`);
+  // A retried job leaves its failed attempt behind; only the newest attempt per name counts.
+  const latest = new Map();
+  for (const j of jobs) {
+    const prev = latest.get(j.name);
+    if (!prev || j.id > prev.id) latest.set(j.name, j);
+  }
+  const failed = [...latest.values()].filter((j) => j.status === 'failed' && !j.allow_failure);
+  return {
+    names: failed.map((j) => j.name),
+    jobIds: failed.map((j) => j.id),
+    allFlaky: failed.length > 0 && Boolean(FLAKY_RE) && failed.every((j) => FLAKY_RE.test(j.name)),
+  };
+}
+
+/** Since when the head's Chromatic snapshots have waited for acceptance, or null. */
+async function chromaticWait(projectId, sha) {
+  if (!sha || !CHROMATIC_STATUS) return null;
+  const statuses = await gl(`/projects/${projectId}/repository/commits/${sha}/statuses`, {
+    per_page: 100,
+  }).catch(() => []);
+  const s = statuses.find((x) => x.name === CHROMATIC_STATUS);
+  if (!s || !['pending', 'running'].includes(s.status)) return null;
+  if (Date.now() - new Date(s.created_at).getTime() < CHROMATIC_GRACE_MS) return null;
+  return { since: s.created_at, description: s.description ?? null, url: s.target_url ?? null };
+}
+
 /**
  * Where a review-author MR stands for you: your approval on the current head (a push after your
  * approval, or a push that reset it, means approve again) and whether your own saved review
@@ -163,7 +326,12 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
   const approvedOnHead = approvedBy && !(approvedAt && pushedAt && pushedAt > approvedAt);
   const sha = detail.sha ?? mr.sha ?? '';
   const notePath = reviewNotes.get(`${mr.iid}-${sha.slice(0, 8).toLowerCase()}`) ?? null;
+  const readyAt = latestSystemNote(discussions, (n) => /^marked this merge request as \*\*ready\*\*/i.test(n.body ?? ''));
+  // Waiting on you since the newest push or un-drafting, whichever came last.
+  const since = [pushedAt, readyAt, mr.created_at].filter(Boolean).sort().pop();
   return {
+    since,
+    noteVerdict: notePath ? noteVerdict(notePath) : null,
     author: mr.author?.username ?? '',
     headSha: sha.slice(0, 8),
     approved: approvedOnHead,
@@ -225,7 +393,7 @@ async function laterBranchHealth(projectId, mergePipeline, branchPipelines, heal
 }
 
 import { extractJiraKeys, getEpicMembers, jiraUrl, resolveEpicByJira } from './jira.mjs';
-import { findReviewNotes } from './review-notes.mjs';
+import { findReviewNotes, noteVerdict } from './review-notes.mjs';
 
 // Branch-name shapes used by Epic wave work, for MRs that carry no ticket key.
 // Branch-name patterns that mark an MR as part of the epic; empty disables.
@@ -293,6 +461,8 @@ function baseCard(mr, epicMembers) {
       (all.some((key) => epicMembers.has(key)) || EPIC_BRANCH_RE.test(mr.source_branch ?? '')),
     project: projectPath(mr),
     iid: mr.iid,
+    branch: mr.source_branch ?? null,
+    author: mr.author?.username ?? null,
     title: mr.title,
     webUrl: mr.web_url,
     state: mr.state,
@@ -326,8 +496,23 @@ export async function fetchOpenCards() {
       ]);
       const pipeline = await pipelineHealth(pid, detail.head_pipeline);
       const required = approvals.approvals_required ?? 0;
+      const base = baseCard(mr, epicMembers);
+      const inMergeTrain = Boolean(detail.merge_when_pipeline_succeeds || detail.auto_merge_enabled);
+      const [lane, failed, chromatic] = await Promise.all([
+        laneInfo({ mr, detail, discussions, key: base.key, project: base.project }).catch(() => null),
+        pipeline.color === 'red' && detail.head_pipeline
+          ? failedJobs(pid, detail.head_pipeline.id).catch(() => null)
+          : null,
+        CHROMATIC_PROJECTS.has(base.project) ? chromaticWait(pid, detail.sha) : null,
+      ]);
       return {
-        ...baseCard(mr, epicMembers),
+        ...base,
+        lane,
+        failedJobs: failed,
+        chromatic,
+        trainDrop: trainDrop(discussions, inMergeTrain),
+        // Newest "requested review from" note: when the MR went to people.
+        reviewRequestedAt: latestSystemNote(discussions, (n) => /^requested review from/i.test(n.body ?? '')),
         headSha: detail.sha ?? mr.sha ?? null,
         pipeline,
         agentReview: parseAgentReview(discussions),
@@ -354,9 +539,7 @@ export async function fetchOpenCards() {
               state: b.state,
             };
           }),
-        inMergeTrain: Boolean(
-          detail.merge_when_pipeline_succeeds || detail.auto_merge_enabled,
-        ),
+        inMergeTrain,
         // Set only for a review author's MR where you are assignee or reviewer.
         yourReview:
           username &&

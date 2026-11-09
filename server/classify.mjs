@@ -44,28 +44,45 @@ export function classify(card, { reviewTray = false } = {}) {
  *   reviewer  Waiting for approval
  *   agent     Agent iteration, Draft, and anything else
  *
+ * Two agent turns carry an `agentReason`, since an agent (tend) acts on them without asking: a
+ * red pipeline whose only failures are known flakes (retry), and an approved MR the merge train
+ * dropped (retry the flake, then re-add).
+ *
  * `column` is where the card shows (a manual override wins over the automatic column).
  */
 export function whoseTurn(card, column = card.autoColumn) {
-  const you = (turnReason) => ({ turn: 'you', turnReason });
+  const you = (turnReason) => ({ turn: 'you', turnReason, agentReason: null });
+  const agent = (agentReason = null) => ({ turn: 'agent', turnReason: null, agentReason });
   if (column === 'merge-failed') return you('fix the failed merge pipeline');
-  if (card.state !== 'opened') return { turn: null, turnReason: null };
-  if (card.yourReview?.needsYou) return you(`approve ${card.yourReview.author}'s MR`);
+  if (card.state !== 'opened') return { turn: null, turnReason: null, agentReason: null };
+  if (card.yourReview?.needsYou) {
+    const author = card.yourReview.author;
+    if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR`);
+    if (card.yourReview.noteVerdict === 'request-changes') {
+      return you(`our review asks for changes: send them to @${author}`);
+    }
+    return you(`review, then approve ${author}'s MR`);
+  }
   if (card.hasConflicts || (card.openBlockers?.length ?? 0) > 0) {
-    return { turn: 'blocked', turnReason: null };
+    return { turn: 'blocked', turnReason: null, agentReason: null };
   }
   if (!card.approvalsMet && card.reapprovalFrom?.length > 0) {
     return you(`ask ${card.reapprovalFrom.map((u) => `@${u}`).join(', ')} to re-approve`);
   }
+  const flakeOnly = card.pipeline?.color === 'red' && card.failedJobs?.allFlaky;
+  if (card.approvalsMet && !card.inMergeTrain && card.trainDrop) {
+    return agent(flakeOnly ? `retry ${card.failedJobs.names.join(', ')}, re-add to train` : 'train drop: retry, re-add');
+  }
   if (card.approvalsMet && !card.inMergeTrain) return you('merge or add to train');
+  if (flakeOnly) return agent(`retry ${card.failedJobs.names.join(', ')} (known flake)`);
   if (!card.yourReview && card.unresolvedHumanThreads > 0) {
     const n = card.unresolvedHumanThreads;
     return you(`answer ${n} thread${n === 1 ? '' : 's'}`);
   }
   if (column === 'ready-human') return you('request review');
   if (card.pipeline?.color === 'running' || column === 'merge-train') {
-    return { turn: 'ci', turnReason: null };
+    return { turn: 'ci', turnReason: null, agentReason: null };
   }
-  if (column === 'waiting-approval') return { turn: 'reviewer', turnReason: null };
-  return { turn: 'agent', turnReason: null };
+  if (column === 'waiting-approval') return { turn: 'reviewer', turnReason: null, agentReason: null };
+  return agent();
 }
