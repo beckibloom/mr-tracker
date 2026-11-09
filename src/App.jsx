@@ -9,13 +9,17 @@ import ReviewTray from './components/ReviewTray.jsx';
 import SessionsPanel from './components/SessionsPanel.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
+import YourMoveStrip from './components/YourMoveStrip.jsx';
 import SearchBox from './components/SearchBox.jsx';
-import { buildChains, buildLinkIndex, setProjectAbbr } from './links.js';
+import { buildFolds, foldIdOf, unblockCounts } from './fold.js';
+import { buildChains, buildLinkIndex, setProjectAbbr, shortRef } from './links.js';
 import { matchCards } from './search.js';
 import { useWheelToHorizontal } from './wheel-scroll.js';
 import { track } from './track.js';
 
 const UI_REFRESH_MS = 60 * 1000;
+// A quick action with this id also shows on the Ready to share header and in the Your move strip.
+const REQUEST_REVIEWS_ID = 'request-reviews';
 
 const App = () => {
   const [board, setBoard] = useState(null);
@@ -23,7 +27,12 @@ const App = () => {
   const [theme, setTheme] = useState(() => localStorage.getItem('mrt-theme') ?? 'light');
   const [view, setView] = useState('board');
   const [timeVisited, setTimeVisited] = useState(false);
-  const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort') ?? 'epic');
+  // null until you pick a sort; the server's MRT_DEFAULT_SORT applies meanwhile.
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem('mrt-sort'));
+  const [dimOthers, setDimOthers] = useState(() => localStorage.getItem('mrt-dim') !== '0');
+  const [openFolds, setOpenFolds] = useState(() => new Set());
+  const [flashKey, setFlashKey] = useState(null);
+  const [importantChoice, setImportantChoice] = useState(null);
   const [hoverKey, setHoverKey] = useState(null);
   const [launcherActions, setLauncherActions] = useState([]);
   const [query, setQuery] = useState('');
@@ -53,8 +62,22 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('mrt-sort', sortBy);
+    if (sortBy) localStorage.setItem('mrt-sort', sortBy);
   }, [sortBy]);
+
+  useEffect(() => {
+    localStorage.setItem('mrt-dim', dimOthers ? '1' : '0');
+  }, [dimOthers]);
+
+  // A card revealed from the Your move strip scrolls into view and flashes briefly.
+  useEffect(() => {
+    if (!flashKey) return undefined;
+    document
+      .querySelector(`[data-card-key="${CSS.escape(flashKey)}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    const t = setTimeout(() => setFlashKey(null), 2000);
+    return () => clearTimeout(t);
+  }, [flashKey]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -125,15 +148,29 @@ const App = () => {
     await load();
   };
 
-  const setImportant = async (key, important) => {
-    track('card:important');
-    await fetch('/api/important', {
+  // A fourth ‼ answers 409 with the flagged three; the chooser then asks which one to drop.
+  const setImportant = async (key, important, replace) => {
+    track(replace ? 'card:important-replace' : 'card:important');
+    const res = await fetch('/api/important', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, important }),
+      body: JSON.stringify({ key, important, replace }),
     });
+    if (res.status === 409) {
+      setImportantChoice({ key, flagged: (await res.json()).flagged ?? [] });
+      return;
+    }
+    setImportantChoice(null);
     await load();
   };
+
+  const toggleFold = (id) =>
+    setOpenFolds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const addLink = async (from, to, type) => {
     track('card:link');
@@ -252,9 +289,34 @@ const App = () => {
     setQuery(q);
   };
 
+  const TRAY_COLUMNS = new Set(['merged', 'review']);
+  const kanban = board.cards.filter((c) => !TRAY_COLUMNS.has(c.column));
+  const unblocks = unblockCounts(kanban, linkIndex);
+  const cardByKey = new Map(cards.map((c) => [c.key, c]));
+
+  const SORTS = {
+    // Epic cards float to the top of their column; recency breaks ties.
+    epic: (a, b) =>
+      (b.epic ? 1 : 0) - (a.epic ? 1 : 0) || new Date(b.updatedAt) - new Date(a.updatedAt),
+    // Oldest MRs (by creation date) float to the top.
+    oldest: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    // Epic cards, then the cards that unblock the most open MRs, then the one idle longest.
+    unblock: (a, b) =>
+      (b.epic ? 1 : 0) - (a.epic ? 1 : 0) ||
+      (unblocks.get(b.key) ?? 0) - (unblocks.get(a.key) ?? 0) ||
+      new Date(a.updatedAt) - new Date(b.updatedAt),
+  };
+  const sortKey = sortBy ?? board.defaultSort ?? 'epic';
+  // Important cards float above everything else in their column, whatever the sort.
+  const bySort = SORTS[sortKey] ?? SORTS.epic;
+  const sortCards = (a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || bySort(a, b);
+  const active = kanban.sort(sortCards);
+  const folds = buildFolds(active, linkIndex);
+
   const boardCtx = {
     allCards: cards,
-    cardByKey: new Map(cards.map((c) => [c.key, c])),
+    cardByKey,
     epicKey: board.epicKey,
     epicLabel: board.epicLabel,
     linkIndex,
@@ -270,21 +332,31 @@ const App = () => {
     launcherActions,
     onLaunchAction: launchAction,
     hidden,
+    folds,
+    openFolds,
+    onToggleFold: toggleFold,
+    dimOthers: dimOthers && !hidden.has('yourmove'),
+    flashKey,
   };
 
-  const SORTS = {
-    // Epic cards float to the top of their column; recency breaks ties.
-    epic: (a, b) =>
-      (b.epic ? 1 : 0) - (a.epic ? 1 : 0) || new Date(b.updatedAt) - new Date(a.updatedAt),
-    // Oldest MRs (by creation date) float to the top.
-    oldest: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-    newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  const reveal = (key) => {
+    track('yourmove:reveal');
+    const card = cardByKey.get(key);
+    const id = card && foldIdOf(card, folds);
+    if (id) setOpenFolds((prev) => new Set(prev).add(id));
+    setFlashKey(key);
   };
-  // Important cards float above everything else in their column, whatever the sort.
-  const bySort = SORTS[sortBy] ?? SORTS.epic;
-  const sortCards = (a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || bySort(a, b);
-  const TRAY_COLUMNS = new Set(['merged', 'review']);
-  const active = board.cards.filter((c) => !TRAY_COLUMNS.has(c.column)).sort(sortCards);
+  const requestAction = launcherActions.find((a) => a.id === REQUEST_REVIEWS_ID);
+  const requestReviews = requestAction ? (
+    <button
+      type="button"
+      className="btn btn--small request-reviews"
+      title={`Start a Claude session: ${requestAction.prompt}`}
+      onClick={() => launchAction(requestAction.id, '')}
+    >
+      {requestAction.prompt}
+    </button>
+  ) : null;
   // Ready MRs that still need you first, then Drafts.
   const forReview = board.cards
     .filter((c) => c.column === 'review' && c.yourReview)
@@ -335,15 +407,29 @@ const App = () => {
           {view === 'board' && !hidden.has('sort') && (
             <label className="sort-control">
               <span className="sort-label">Sort by</span>
-              <select value={sortBy} onChange={(e) => {
+              <select value={sortKey} onChange={(e) => {
                   track('sort');
                   setSortBy(e.target.value);
                 }}>
                 <option value="epic">Epic first</option>
+                <option value="unblock">Epic, then unblocks most</option>
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
               </select>
             </label>
+          )}
+          {view === 'board' && !hidden.has('yourmove') && (
+            <button
+              className={`btn${dimOthers ? ' btn--on' : ''}`}
+              aria-pressed={dimOthers}
+              onClick={() => {
+                track('yourmove:dim');
+                setDimOthers((d) => !d);
+              }}
+              title="Dim cards that aren't your move"
+            >
+              Dim others
+            </button>
           )}
           {board.lastError && <span className="sync-error">⚠ {board.lastError}</span>}
           <span
@@ -372,6 +458,9 @@ const App = () => {
       </header>
       {view === 'board' && (
         <>
+          {!hidden.has('yourmove') && (
+            <YourMoveStrip cards={cards} onReveal={reveal} requestReviews={requestReviews} />
+          )}
           <main className="board" ref={boardRef}>
             {board.columns.map((col) => (
               <Column
@@ -380,6 +469,7 @@ const App = () => {
                 cards={active.filter((c) => c.column === col.id)}
                 onDropCard={moveCard}
                 onSaveNote={saveNote}
+                headerAction={col.id === 'ready-human' ? requestReviews : null}
               />
             ))}
           </main>
@@ -403,6 +493,41 @@ const App = () => {
         <div className="sessions-view">
           <LaunchPanel />
           <SessionsPanel onOpen={openClaude} />
+        </div>
+      )}
+      {importantChoice && (
+        <div className="choice-backdrop" onClick={() => setImportantChoice(null)}>
+          <div
+            className="choice-dialog"
+            role="dialog"
+            aria-label="Choose a flag to drop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p>
+              {importantChoice.flagged.length} MRs are already flagged ‼. Drop one to flag{' '}
+              {cardByKey.get(importantChoice.key) ? shortRef(cardByKey.get(importantChoice.key)) : 'this MR'}:
+            </p>
+            <ul className="choice-list">
+              {importantChoice.flagged.map((f) => {
+                const c = cardByKey.get(f.key);
+                return (
+                  <li key={f.key}>
+                    <button
+                      type="button"
+                      className="btn choice-btn"
+                      onClick={() => setImportant(importantChoice.key, true, f.key)}
+                    >
+                      <strong>{c ? shortRef(c) : f.key}</strong> {c?.title}
+                      {f.reason && <span className="choice-reason">{f.reason}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <button type="button" className="btn" onClick={() => setImportantChoice(null)}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       {notice && (

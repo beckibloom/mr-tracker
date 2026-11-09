@@ -73,7 +73,7 @@ These are the lines I won't move in this copy; a fork is the place to cross them
 | -------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `server/index.mjs`               | Express app, sync loop, all `/api/*` endpoints, mention → suggestion resolution                |
 | `server/gitlab.mjs`              | GitLab API calls; turns MRs into cards (pipeline health, AI review, human threads, mentions)    |
-| `server/classify.mjs`            | Column list and the classification order                                                       |
+| `server/classify.mjs`            | Column list, the classification order, and whose turn each card is                             |
 | `server/review-notes.mjs`        | Finds your saved `mr-review-<iid>-<sha8>.md` files for the Your review tray                     |
 | `server/jira.mjs`                | Jira links, epic membership, worklog writes                                                    |
 | `server/claude.mjs`              | Launch, focus and list Claude Code sessions in Terminal.app                                    |
@@ -82,6 +82,8 @@ These are the lines I won't move in this copy; a fork is the place to cross them
 | `src/App.jsx`                    | Board state, API calls, view switch, `BoardContext` provider                                    |
 | `src/components/Card.jsx`        | The card: header, chips, link chips and picker, suggestions, note                              |
 | `src/components/ChainsPanel.jsx` | The Chains tab                                                                                 |
+| `src/components/YourMoveStrip.jsx` | The Your move strip above the columns                                                        |
+| `src/fold.js`                    | Pure helpers: folding blocked cards under their blocker, unblock counts for the sort           |
 | `src/components/ReviewTray.jsx`  | The Your review tray: review-author MRs you approve, red dot while any needs you               |
 | `src/components/SessionsPanel.jsx`| The Sessions tab                                                                               |
 | `src/links.js`                   | Pure helpers: link index, chains, "your turn" signals, chain layering, project abbreviations   |

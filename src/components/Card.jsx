@@ -36,6 +36,15 @@ const agentChip = (review, column) => {
   return <span className="chip chip--warn">agent: {label}</span>;
 };
 
+// Short labels for whose move a card waits on (server/classify.mjs whoseTurn).
+const TURN_TEXT = {
+  you: 'your move',
+  agent: 'agent',
+  reviewer: 'reviewer',
+  ci: 'CI',
+  blocked: 'blocked',
+};
+
 const stopDrag = {
   draggable: false,
   onMouseDown: (e) => e.stopPropagation(),
@@ -484,7 +493,10 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
     onLaunchAction,
     onSetImportant,
     hidden = new Set(),
+    dimOthers = false,
+    flashKey = null,
   } = useContext(BoardContext);
+  const showTurn = !hidden.has('yourmove') && Boolean(card.turn);
   const session = card.claudeSession;
   const entry = linkIndex.get(card.key);
   const signals = cardSignals(card, entry);
@@ -497,6 +509,9 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
   if (signals.heat) classes.push(`card--heat-${signals.heat}`);
   if (searchSet) classes.push(searchSet.has(card.key) ? 'card--search-hit' : 'card--dim');
   else if (litSet) classes.push(litSet.has(card.key) ? 'card--lit' : 'card--dim');
+  else if (dimOthers && showTurn && card.turn !== 'you') classes.push('card--not-yours');
+  if (flashKey === card.key) classes.push('card--flash');
+  const flag = card.importantInfo;
 
   return (
     <article
@@ -601,6 +616,14 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
       </div>
       <div className="card-ref-row">
         <CopyRef card={card} />
+        {showTurn && (
+          <span
+            className={`turn-label turn-label--${card.turn}`}
+            title={card.turnReason ? `Your move: ${card.turnReason}` : `Waiting on: ${TURN_TEXT[card.turn]}`}
+          >
+            {TURN_TEXT[card.turn]}
+          </span>
+        )}
       </div>
       <a
         className="card-title"
@@ -612,6 +635,15 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
       >
         {card.title.replace(/^Draft:\s*/, '')}
       </a>
+      {card.important && flag && (flag.reason || flag.by) && (
+        <div className="card-important-reason" title={flag.reason ?? undefined}>
+          <span className="card-important-text">‼ {flag.reason ?? 'flagged'}</span>
+          <span className="card-important-meta">
+            {flag.by && ` · ${flag.by}`}
+            {flag.at && ` · ${relTime(flag.at)} ago`}
+          </span>
+        </div>
+      )}
       <div className="card-chips">
         {card.hasConflicts && (
           <a

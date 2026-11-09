@@ -328,6 +328,7 @@ export async function fetchOpenCards() {
       const required = approvals.approvals_required ?? 0;
       return {
         ...baseCard(mr, epicMembers),
+        headSha: detail.sha ?? mr.sha ?? null,
         pipeline,
         agentReview: parseAgentReview(discussions),
         unresolvedHumanThreads: countUnresolvedHumanThreads(discussions, mr.author?.username),

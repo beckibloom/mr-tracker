@@ -17,7 +17,7 @@ import {
   projectDir,
   sessionStatus,
 } from './claude.mjs';
-import { classify, COLUMNS } from './classify.mjs';
+import { classify, COLUMNS, whoseTurn } from './classify.mjs';
 import { assertToken, fetchMergedCards, fetchOpenCards, REVIEW_AUTHORS } from './gitlab.mjs';
 import { addWorklog, getLoggedTime, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
@@ -40,6 +40,8 @@ import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
 const PORT = Number(process.env.MRT_PORT ?? 4178);
+// The board's sort until you pick one: epic, unblock, newest or oldest.
+const DEFAULT_SORT = process.env.MRT_DEFAULT_SORT || 'epic';
 // MRT_PROJECT_ABBR=my-frontend=FE,design-system=DS  (short names on link chips)
 const PROJECT_ABBR = Object.fromEntries(
   (process.env.MRT_PROJECT_ABBR ?? '')
@@ -55,6 +57,10 @@ const COLUMN_IDS = new Set(COLUMNS.map((c) => c.id));
 state.todos ??= [];
 state.notes ??= {};
 state.important ??= {};
+// ‼ flags were plain `true` before they carried a reason and a snapshot.
+for (const [key, flag] of Object.entries(state.important)) {
+  if (flag === true) state.important[key] = { reason: null, by: null, at: null, snapshot: null };
+}
 state.links ??= [];
 state.dismissed ??= {};
 state.claudeSessions ??= {};
@@ -86,9 +92,7 @@ async function sync() {
     for (const key of Object.keys(state.notes)) {
       if (!cards[key]) delete state.notes[key];
     }
-    for (const key of Object.keys(state.important)) {
-      if (!cards[key] || cards[key].state === 'merged') delete state.important[key];
-    }
+    clearStaleImportant(cards);
     state.links = state.links.filter((l) => cards[l.from] && cards[l.to]);
     for (const key of Object.keys(state.claudeSessions)) {
       if (!cards[key]) delete state.claudeSessions[key];
@@ -107,6 +111,36 @@ async function sync() {
     syncing = false;
   }
 }
+
+// At most this many MRs carry the ‼ flag at once.
+const IMPORTANT_CAP = 3;
+
+/** What a ‼ flag was set against; the flag clears once any of it changes. */
+const importantSnapshot = (card) => ({
+  autoColumn: card.autoColumn ?? null,
+  headSha: card.headSha ?? null,
+  approvalsMet: Boolean(card.approvalsMet),
+  pipelineColor: card.pipeline?.color ?? null,
+});
+
+/** Drop ‼ flags whose MR merged or closed, or whose situation moved since the flag was set. */
+function clearStaleImportant(cards) {
+  for (const [key, flag] of Object.entries(state.important)) {
+    const card = cards[key];
+    if (!card || card.state !== 'opened') {
+      delete state.important[key];
+      continue;
+    }
+    const now = importantSnapshot(card);
+    if (!flag.snapshot) flag.snapshot = now;
+    else if (Object.keys(now).some((k) => flag.snapshot[k] !== now[k])) delete state.important[key];
+  }
+}
+
+const importantInfo = (key) => {
+  const flag = state.important[key];
+  return flag ? { reason: flag.reason, by: flag.by, at: flag.at } : null;
+};
 
 /** Turn each card's raw MR references into keys of other cards on the board. */
 function resolveMentions(cards) {
@@ -185,15 +219,20 @@ app.use(express.json());
 
 app.get('/api/board', (_req, res) => {
   adoptPending();
-  const cards = Object.values(state.cards).map((card) => ({
-    ...card,
-    column: state.overrides[card.key]?.column ?? card.autoColumn,
-    overridden: Boolean(state.overrides[card.key]),
-    note: state.notes[card.key] ?? '',
-    important: Boolean(state.important[card.key]),
-    suggestions: suggestionsFor(card),
-    claudeSession: withStatus(state.claudeSessions[card.key]),
-  }));
+  const cards = Object.values(state.cards).map((card) => {
+    const column = state.overrides[card.key]?.column ?? card.autoColumn;
+    return {
+      ...card,
+      column,
+      ...whoseTurn(card, column),
+      overridden: Boolean(state.overrides[card.key]),
+      note: state.notes[card.key] ?? '',
+      important: Boolean(state.important[card.key]),
+      importantInfo: importantInfo(card.key),
+      suggestions: suggestionsFor(card),
+      claudeSession: withStatus(state.claudeSessions[card.key]),
+    };
+  });
   res.json({
     columns: COLUMNS,
     cards,
@@ -209,6 +248,7 @@ app.get('/api/board', (_req, res) => {
     hidden: HIDDEN,
     reviewTray: REVIEW_TRAY,
     reviewNotes: Boolean(REVIEW_NOTES_DIR),
+    defaultSort: DEFAULT_SORT,
     linkBrowser: Boolean(LINK_BROWSER),
   });
 });
@@ -274,14 +314,37 @@ app.post('/api/note', (req, res) => {
   res.json({ ok: true, note });
 });
 
+// Body: { key, important, reason?, by?, replace? }. Flagging a fourth MR answers 409 with the
+// current three unless `replace` names one of them, which is unflagged in its place.
 app.post('/api/important', (req, res) => {
-  const { key } = req.body ?? {};
-  if (!state.cards[key]) return res.status(404).json({ error: `Unknown card ${key}` });
-  const important = Boolean(req.body?.important);
-  if (important) state.important[key] = true;
-  else delete state.important[key];
+  const { key, replace } = req.body ?? {};
+  const card = state.cards[key];
+  if (!card) return res.status(404).json({ error: `Unknown card ${key}` });
+  if (!req.body?.important) {
+    delete state.important[key];
+    saveState(state);
+    return res.json({ ok: true, important: false });
+  }
+  if (card.state !== 'opened') return res.status(400).json({ error: 'Only open MRs can be flagged.' });
+  const others = Object.keys(state.important).filter((k) => k !== key);
+  if (!state.important[key] && others.length >= IMPORTANT_CAP) {
+    if (!replace || !others.includes(replace)) {
+      return res.status(409).json({
+        error: `At most ${IMPORTANT_CAP} MRs can be flagged ‼. Pass replace: <key> to drop one.`,
+        flagged: others.map((k) => ({ key: k, reason: state.important[k].reason, at: state.important[k].at })),
+      });
+    }
+    delete state.important[replace];
+  }
+  const text = (v, max) => String(v ?? '').trim().slice(0, max) || null;
+  state.important[key] = {
+    reason: text(req.body.reason, 300),
+    by: text(req.body.by, 60),
+    at: new Date().toISOString(),
+    snapshot: importantSnapshot(card),
+  };
   saveState(state);
-  res.json({ ok: true, important });
+  res.json({ ok: true, important: true, ...importantInfo(key) });
 });
 
 /** Unmerged MRs a card waits on, from board links and GitLab's dependency field. */
@@ -362,6 +425,8 @@ function cardBrief(card, userPrompt) {
   if (rel.length) lines.push('- Related MRs:', ...rel);
   const note = state.notes[card.key];
   if (note) lines.push(`- My note on the card: ${note}`);
+  const flag = state.important[card.key];
+  if (flag) lines.push(`- Flagged important (‼)${flag.reason ? `: ${flag.reason}` : ''}`);
   lines.push('', '## Request', '', userPrompt.trim());
   return lines.join('\n');
 }

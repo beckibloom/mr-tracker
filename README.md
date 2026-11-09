@@ -73,6 +73,39 @@ marker, an `AI_REVIEW_COUNTS critical=N major=N minor=N` line, and an
 `parseAgentReview` in `server/gitlab.mjs`; without any bots, every open non-draft MR sits
 in Agent iteration until you drag it.
 
+## Your move
+
+Every open card carries a turn, worked out on the server (`whoseTurn` in
+`server/classify.mjs`), first match wins:
+
+| Turn       | When                                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `you`      | Merge failed; a Your review MR needs you; re-approval needed; approved but not in the train; unresolved human threads on your own MR; Ready to share |
+| `blocked`  | Merge conflicts, or an open blocker                                                                    |
+| `ci`       | Pipeline running, or in the merge train                                                                |
+| `reviewer` | Waiting for approval                                                                                   |
+| `agent`    | Agent iteration, Draft, anything else                                                                  |
+
+The **Your move** strip above the columns lists every `you` card as one compact row: ref, title
+and what to do ("ask @x to re-approve", "merge or add to train", "answer 2 threads"). ‼ cards
+come first, then the one idle longest. Several Ready to share cards collapse into one row,
+`N ready to share`, which also offers a `request-reviews` quick action when you define one (see
+Claude sessions). Click a ref to scroll to its card, unfolding it if needed; the title opens the
+MR. With nothing to do the strip says "Nothing waiting on you".
+
+Each card shows its turn as a small label next to its ref. **Dim others** in the top bar fades
+every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`
+hides the strip, the labels and the toggle.
+
+## Blocked cards fold under their blocker
+
+A card with an open blocker (a board `blocked by` or `follows` link, or a GitLab dependency)
+folds under the card it waits on, as `+N blocked by this`; a chain folds under its first
+card. One click expands the stack. When the blocker isn't on the board (someone else's MR, or
+one in a tray), its blocked cards group under a `⛓ blocked by FE!123` header in their own
+column. Search expands any fold holding a match, and the Your move strip unfolds a card it
+jumps to. The Chains tab still shows every chain in full.
+
 ## What's on a card
 
 ```
@@ -92,9 +125,16 @@ waiting on Sam's review                    your note
   whenever the branch conflicts with its target (click it to open the MR), `feedback · N` for unresolved
   threads from humans, AI issue counts, `approved` outside the Approved column,
   `auto-merge` while approvals are outstanding, and `manual ×` for an override.
-- **Tools** (right of the header, bright on hover): `‼` marks the MR important (bold red border, top of its column under any sort; click again to clear; cleared when it merges), the megaphone copies a Slack-ready
+- **Tools** (right of the header, bright on hover): `‼` marks the MR important (bold red border, top of its column under any sort; click again to clear), the megaphone copies a Slack-ready
   review request (`:merge-request: <title> <url>`, title prefixes stripped), the chain
   link links to another MR, `+` adds a note. Notes are one line, click to edit, × to clear.
+- **‼ important**: at most three MRs at once. Flagging a fourth asks which one to drop. Agents
+  can flag through `POST /api/important` with `{ key, important: true, reason, by }`; the
+  reason shows under the title (one line, full text on hover) with who set it and when. A
+  flag clears itself when the MR merges or closes, or when its column, head commit, approval
+  state or pipeline colour changes, since the step it asked for has happened or the situation
+  moved. A fourth flag through the API answers `409` with the current three, unless the body
+  names one in `replace`.
 - MRs in the epic you're most focused on get a purple border and a `FOCUS` badge (see
   `FOCUSED_EPIC_KEY`; `FOCUSED_EPIC_LABEL` changes the badge text).
 
@@ -163,6 +203,9 @@ replaced with what you typed or picked:
 `input` is `none`, `text` or `mr`; `cwd` (optional, `~` allowed) sets where the session starts,
 falling back to `MRT_LAUNCHER_CWD`, then your home directory.
 
+An action with id `request-reviews` also appears as a button under the Ready to share header and
+on the Your move strip's ready-to-share row, labelled with its prompt.
+
 Sessions use the model, permission mode and effort from your `~/.claude/settings.json`;
 `MRT_CLAUDE_ARGS` adds flags on top (for example `--model fable --permission-mode auto`).
 Each session is named after the MR ref and your prompt, which is what `claude agents` and
@@ -218,7 +261,7 @@ actions, the cheat sheet) in `data/usage.json`, which never leaves your machine.
 spot what you never touch.
 
 Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
-`sessions`, `chains`, `time` (tabs), `search`, `sort`, `todos`, `merged`, `review` (trays), and the card
+`sessions`, `chains`, `time` (tabs), `search`, `sort`, `yourmove` (strip, turn labels, Dim others), `todos`, `merged`, `review` (trays), and the card
 tools `important`, `review-request`, `claude`, `links`, `notes`.
 
 ## Setup
@@ -269,6 +312,7 @@ The rest:
 | `MRT_LINK_BROWSER` | — | A macOS app name, e.g. `"Google Chrome"`. Links on the board (MRs, Jira, pipelines) open in that app, which helps when the board runs inside VS Code's browser. |
 | `MRT_REVIEW_AUTHORS` | — | Comma-separated authors (usually an agent account) whose MRs you approve yourself; their MRs assigned to you or awaiting your review go to the Your review tray. Empty turns the tray off. |
 | `MRT_REVIEW_NOTES_DIR` | — | Where you save your own reviews as `mr-review-<iid>-<sha8>.md`, at any depth. Set it to show the "our review" chip in the Your review tray. |
+| `MRT_DEFAULT_SORT` | `epic` | The sort until you pick one in the top bar: `epic`, `unblock` (‼, then the focused epic, then cards that unblock the most open MRs, then idle longest), `newest` or `oldest`. |
 | `MRT_HIDE` | — | Comma-separated features to hide, e.g. `chains,time,todos` (see Feature usage and hiding). |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
