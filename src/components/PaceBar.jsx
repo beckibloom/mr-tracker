@@ -7,11 +7,12 @@ const REFRESH_MS = 10 * 60 * 1000;
 const shortDate = (iso) =>
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
+// This week against the target, pro-rated over Monday to Friday (server/pace.mjs).
 const STATUS_TEXT = {
-  good: 'on pace',
-  warn: 'close to pace',
-  bad: 'below pace',
-  unknown: 'no rate yet',
+  good: 'target met this week',
+  warn: 'on track this week',
+  bad: 'behind this week',
+  unknown: 'no count yet',
 };
 
 /** Weekly removals as tiny bars, oldest first; the current partial week is hollow. */
@@ -75,12 +76,20 @@ const PaceBar = ({ onOpenProgram }) => {
           </span>
         )}
       </span>
-      <span className="pace-rate" title={`Mean files removed per week over the last ${pace.windowWeeks} whole weeks`}>
-        <strong>{perWeek ?? '—'}</strong>/wk ({pace.windowWeeks}-wk avg) · target {target}
+      <span
+        className="pace-rate"
+        title={`Files removed since Monday. By now the week should have removed ${pace.expectedByNow} (the target pro-rated over Monday to Friday).`}
+      >
+        this week <strong>{now.removed ?? '—'}</strong> / {target}
+        {now.removed != null && now.removed < target && (
+          <span className="pace-muted"> (expect {pace.expectedByNow} by now)</span>
+        )}
       </span>
-      <Bars points={pace.points} now={now} target={target} />
       <span className={`pace-status pace-status--${status}`}>{STATUS_TEXT[status]}</span>
-      {now.removed != null && <span className="pace-muted">this week {now.removed}</span>}
+      <Bars points={pace.points} now={now} target={target} />
+      <span className="pace-muted" title={`Mean files removed per week over the last ${pace.windowWeeks} whole weeks`}>
+        {perWeek ?? '—'}/wk {pace.windowWeeks}-wk avg
+      </span>
       {pace.goalDate && pace.neededForGoal != null && (
         <span className="pace-muted" title={`Files left ÷ weeks to ${pace.goalDate}, without holidays`}>
           {pace.neededForGoal}/wk meets {shortDate(pace.goalDate)}

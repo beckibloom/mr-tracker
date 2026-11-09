@@ -114,6 +114,13 @@ export function removedBetween(before, after, packages) {
   return removed;
 }
 
+/** How much of the working week (Monday 00:00 to Friday 24:00) has passed, 0 to 1. */
+function weekFraction(d = new Date()) {
+  const day = (d.getDay() + 6) % 7; // Monday 0
+  if (day >= 5) return 1;
+  return Math.min((day + (d.getHours() + d.getMinutes() / 60) / 24) / 5, 1);
+}
+
 const mondayOf = (d) => {
   const m = new Date(d);
   m.setHours(0, 0, 0, 0);
@@ -194,7 +201,13 @@ async function compute() {
     perWeek && perWeek > 0
       ? new Date(Date.now() + (now.total / perWeek) * 7 * 24 * 3600 * 1000).toISOString().slice(0, 10)
       : null;
-  const status = perWeek == null ? 'unknown' : perWeek >= TARGET ? 'good' : perWeek >= TARGET * 0.8 ? 'warn' : 'bad';
+  const avgStatus =
+    perWeek == null ? 'unknown' : perWeek >= TARGET ? 'good' : perWeek >= TARGET * 0.8 ? 'warn' : 'bad';
+  // The header's colour is this week against the target, pro-rated over the working week
+  // (Monday to Friday): by Wednesday noon the week should have removed half the target.
+  const expectedByNow = Math.ceil(TARGET * weekFraction());
+  const status =
+    now.removed == null ? 'unknown' : now.removed >= TARGET ? 'good' : now.removed >= expectedByNow ? 'warn' : 'bad';
 
   return {
     enabled: true,
@@ -207,6 +220,8 @@ async function compute() {
     windowWeeks: WINDOW_WEEKS,
     perWeek,
     thisWeek: now.removed,
+    expectedByNow,
+    avgStatus,
     neededForGoal,
     finishAtRate,
     status,

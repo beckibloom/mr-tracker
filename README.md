@@ -119,14 +119,18 @@ on the main branch that still import it and compares the weekly removal rate wit
 (`MRT_PACE_TARGET`, default 50):
 
 ```
-780 files left (92 vendor) · 32/wk (4-wk avg) · target 50 ▁▂▅▃ below pace · this week 99 · 45/wk meets Mar 12, 2027 · at this rate: Apr 29, 2027
+780 files left (92 vendor) · this week 102 / 50 · target met this week ▁▂▅▃ · 32/wk 4-wk avg · 45/wk meets Mar 12, 2027 · at this rate: Apr 29, 2027
 ```
 
 - **Left:** files on `MRT_PACE_REF` (default `origin/main`) with the scope in a module-reference
   position (`from '…'`, `import '…'`, `import('…')`, `require('…')`), in `.ts .tsx .js .jsx .mjs
   .cjs` files, skipping `MRT_PACE_EXCLUDE` paths. A file counts once however many packages it
   imports. `MRT_PACE_SPLIT` paths are counted and also shown on their own.
-- **Rate:** the mean number of files removed per week over the last four whole weeks, Monday to
+- **This week and the colour:** files removed since Monday against the target. The colour
+  follows this week, pro-rated over Monday to Friday: green once the week reaches the target,
+  orange while it is at or above the share the target expects by now (half by Wednesday noon),
+  red when it is behind that share. "expect N by now" shows the share.
+- **4-wk avg:** the mean number of files removed per week over the last four whole weeks, Monday to
   Monday. "Removed" is a set difference (files counted last Monday and not this Monday), so code
   moved in from elsewhere doesn't hide a week's progress.
 - **Bars:** files removed each week, the dashed line at the target; the hollow bar is this week so
