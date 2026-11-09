@@ -279,7 +279,9 @@ const App = () => {
     oldest: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
     newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   };
-  const sortCards = SORTS[sortBy] ?? SORTS.epic;
+  // Important cards float above everything else in their column, whatever the sort.
+  const bySort = SORTS[sortBy] ?? SORTS.epic;
+  const sortCards = (a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || bySort(a, b);
   const active = board.cards.filter((c) => c.column !== 'merged').sort(sortCards);
   const merged = board.cards.filter((c) => c.column === 'merged').sort(sortCards);
 
