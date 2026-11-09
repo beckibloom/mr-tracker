@@ -128,7 +128,7 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, reminders = [], sectio
     .filter((c) => c.important && c.turn && c.turn !== 'you')
     .map((c) => {
       const who = TURN_TEXT[c.turn] ?? c.turn;
-      const what = c.importantInfo?.reason ?? c.agentReason;
+      const what = c.importantInfo?.reason ?? c.waitReason;
       return <Row key={c.key} card={c} onReveal={onReveal} reason={`${who}${what ? `: ${what}` : ''}`} />;
     });
 

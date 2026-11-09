@@ -86,6 +86,11 @@ Every open card carries a turn, worked out on the server (`whoseTurn` in
 | `reviewer` | Waiting for approval                                                                                   |
 | `agent`    | Agent iteration, Draft, anything else. Two agent turns carry a reason, because an agent can clear them without asking: a red pipeline whose only failures are known flakes (`MRT_FLAKY_JOBS`), and an approved MR the merge train dropped |
 
+Every other turn also carries the next step as an instruction, so a card waiting on someone
+else still says what has to happen: "merge !972 first", "rebase to clear merge conflicts",
+"fix 1 issue from the agent review", "wait for the first agent review", "finish the Draft,
+then mark it ready", "wait for the merge train". The turn label's tooltip shows it.
+
 A Your review MR's reason follows your saved review (see Your review tray): "our review says
 approve", "our review asks for changes", or "review, then approve" when there is none for the
 head.
@@ -99,7 +104,8 @@ The **Your move** strip above the columns answers "what next", top to bottom:
    Several Ready to share cards collapse into one row, `N ready to share with no reviewer, oldest
    2d`, which also offers a `request-reviews` quick action when you define one (see Claude
    sessions).
-4. ‼ cards whose move is someone else's, with who holds it and the flag's reason. A ‼ never
+4. ‼ cards whose move is someone else's, with who holds it and the flag's reason, or the
+   turn's next step when the flag has none ("blocked: merge !972 first"). A ‼ never
    leaves the strip just because it waits on a person or CI.
 5. Your MRs whose Chromatic snapshots wait for acceptance.
 6. Later reminders.

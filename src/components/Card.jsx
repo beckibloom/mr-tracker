@@ -710,7 +710,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
             title={
               card.turnReason
                 ? `Your move: ${card.turnReason}`
-                : `Waiting on: ${TURN_TEXT[card.turn]}${card.agentReason ? ` (${card.agentReason})` : ''}`
+                : `Waiting on: ${TURN_TEXT[card.turn]}${card.waitReason ? `: ${card.waitReason}` : ''}`
             }
           >
             {TURN_TEXT[card.turn]}
