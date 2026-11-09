@@ -5,6 +5,7 @@ import ChainsPanel from './components/ChainsPanel.jsx';
 import Column from './components/Column.jsx';
 import LaunchPanel from './components/LaunchPanel.jsx';
 import MergedTray from './components/MergedTray.jsx';
+import ReviewTray from './components/ReviewTray.jsx';
 import SessionsPanel from './components/SessionsPanel.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
@@ -282,7 +283,12 @@ const App = () => {
   // Important cards float above everything else in their column, whatever the sort.
   const bySort = SORTS[sortBy] ?? SORTS.epic;
   const sortCards = (a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || bySort(a, b);
-  const active = board.cards.filter((c) => c.column !== 'merged').sort(sortCards);
+  const TRAY_COLUMNS = new Set(['merged', 'review']);
+  const active = board.cards.filter((c) => !TRAY_COLUMNS.has(c.column)).sort(sortCards);
+  // Ready MRs that still need you first, then Drafts.
+  const forReview = board.cards
+    .filter((c) => c.column === 'review' && c.yourReview)
+    .sort((a, b) => (b.yourReview.needsYou ? 1 : 0) - (a.yourReview.needsYou ? 1 : 0) || sortCards(a, b));
   const merged = board.cards.filter((c) => c.column === 'merged').sort(sortCards);
 
   return (
@@ -377,6 +383,9 @@ const App = () => {
               />
             ))}
           </main>
+          {board.reviewTray && !hidden.has('review') && (
+            <ReviewTray cards={forReview} showNotes={board.reviewNotes} />
+          )}
           {!hidden.has('todos') && (
             <TodoTray
               todos={board.todos ?? []}

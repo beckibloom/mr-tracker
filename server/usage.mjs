@@ -30,6 +30,9 @@ export const FEATURES = {
   'todo:toggle': 'Checking off a to-do',
   'tray:todos': 'Opening the to-do tray',
   'tray:merged': 'Opening the merged tray',
+  'review:open': 'Opening the Your review tray',
+  'review:mr': 'Opening an MR from the Your review tray',
+  'review:note': 'Opening a saved review from the Your review tray',
 };
 
 let usage = { since: new Date().toISOString(), features: {} };

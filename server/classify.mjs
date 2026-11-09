@@ -8,13 +8,15 @@ export const COLUMNS = [
   { id: 'merge-failed', label: 'Merge failed' },
 ];
 
-// 'merged' is not a visible column; it feeds the collapsed tray.
-export function classify(card) {
+// 'merged' and 'review' are not visible columns; they feed the collapsed trays.
+export function classify(card, { reviewTray = false } = {}) {
   if (card.state === 'merged') {
     if (card.pipeline.color === 'red') return 'merge-failed';
     if (card.pipeline.color === 'running') return 'merge-train'; // merge pipeline still running
     return 'merged';
   }
+  // A review author's MR waiting on you lives only in the Your review tray.
+  if (reviewTray && card.yourReview) return 'review';
   // Auto-merge armed before approval is still waiting on humans, not on the train.
   if (card.inMergeTrain && card.approvalsMet) return 'merge-train';
   if (card.draft) return 'draft';

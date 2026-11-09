@@ -1705,6 +1705,93 @@ button.card-note-text {
   background: var(--surface);
 }
 
+/* Your review tray: MRs a review author built for you to approve */
+.review-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.review-needs-dot {
+  margin-top: 0;
+}
+
+.review-body {
+  padding: 0 1.25rem 1rem;
+}
+
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.review-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  padding: 0.375rem 0;
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.review-item + .review-item {
+  border-top: 1px solid var(--border);
+}
+
+.review-item .pipeline-dot {
+  margin-top: 0;
+}
+
+.review-item--needs .review-title {
+  font-weight: 600;
+}
+
+.review-item--dim {
+  opacity: 0.3;
+}
+
+.review-ref {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.review-title {
+  flex: 1 1 16rem;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.review-title:hover {
+  color: var(--gl-blue-500);
+  text-decoration: underline;
+}
+
+.review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.review-pipeline {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+a.review-pipeline:hover,
+a.review-note:hover {
+  text-decoration: underline;
+}
+
+.review-note {
+  text-decoration: none;
+}
+
 .todo-body {
   padding: 0 1.25rem 1rem;
 }

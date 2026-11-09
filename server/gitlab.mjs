@@ -12,6 +12,15 @@ const BOT_USERNAMES = new Set(
     .filter(Boolean),
 );
 
+// Authors whose MRs you approve yourself (an agent that builds MRs for you). Their open MRs where
+// you are assignee or reviewer leave the columns for the Your review tray. Empty hides the tray.
+export const REVIEW_AUTHORS = new Set(
+  (process.env.MRT_REVIEW_AUTHORS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+
 export function assertToken() {
   if (!TOKEN) {
     throw new Error('No GitLab token found. Export GITLAB_MCP_TOKEN (or GITLAB_TOKEN).');
@@ -48,6 +57,33 @@ async function listMyMergeRequests(params) {
   return [...seen.values()];
 }
 
+let currentUser = null;
+/** The token's user, fetched once. */
+function me() {
+  currentUser ??= gl('/user').catch((err) => {
+    currentUser = null;
+    throw err;
+  });
+  return currentUser;
+}
+
+/** Open MRs by a review author where you are assignee or reviewer, whatever MRT_MR_SCOPE says. */
+async function listReviewMergeRequests(params, username) {
+  const seen = new Map();
+  for (const author of REVIEW_AUTHORS) {
+    for (const role of ['assignee_username', 'reviewer_username']) {
+      const batch = await glAll('/merge_requests', {
+        ...params,
+        scope: 'all',
+        author_username: author,
+        [role]: username,
+      });
+      for (const mr of batch) seen.set(`${mr.project_id}!${mr.iid}`, mr);
+    }
+  }
+  return [...seen.values()];
+}
+
 export async function glAll(path, params = {}) {
   const all = [];
   for (let page = 1; page <= 10; page++) {
@@ -63,7 +99,8 @@ function parseAgentReview(discussions) {
   let latest = null;
   for (const d of discussions) {
     for (const n of d.notes ?? []) {
-      if (!isBot(n.author?.username ?? '')) continue;
+      const author = n.author?.username ?? '';
+      if (!isBot(author) && !REVIEW_AUTHORS.has(author)) continue;
       if (!n.body?.includes('AI_CODE_REVIEW')) continue;
       if (n.body.includes('Outdated Review')) continue;
       if (!latest || n.created_at > latest.created_at) latest = n;
@@ -103,6 +140,40 @@ function resetApprovers(discussions, approvedBy) {
   return [...state.entries()]
     .filter(([user, s]) => s === 'reset' && !current.has(user) && !isBot(user))
     .map(([user]) => user);
+}
+
+const latestSystemNote = (discussions, test) =>
+  discussions
+    .flatMap((d) => d.notes ?? [])
+    .filter((n) => n.system && test(n))
+    .reduce((at, n) => (!at || n.created_at > at ? n.created_at : at), null);
+
+/**
+ * Where a review-author MR stands for you: your approval on the current head (a push after your
+ * approval, or a push that reset it, means approve again) and whether your own saved review
+ * matches the head sha. `needsYou`: ready (not Draft) and not approved by you on the head.
+ */
+function yourReviewState({ mr, detail, approvals, discussions, username, reviewNotes }) {
+  const approvedBy = (approvals.approved_by ?? []).some((a) => a.user?.username === username);
+  const approvedAt = latestSystemNote(
+    discussions,
+    (n) => n.author?.username === username && /^approved this merge request/i.test(n.body ?? ''),
+  );
+  const pushedAt = latestSystemNote(discussions, (n) => /^added \d+ (new )?commits?/i.test(n.body ?? ''));
+  const approvedOnHead = approvedBy && !(approvedAt && pushedAt && pushedAt > approvedAt);
+  const sha = detail.sha ?? mr.sha ?? '';
+  const notePath = reviewNotes.get(`${mr.iid}-${sha.slice(0, 8).toLowerCase()}`) ?? null;
+  return {
+    author: mr.author?.username ?? '',
+    headSha: sha.slice(0, 8),
+    approved: approvedOnHead,
+    // You approved an earlier head, or a push reset your approval.
+    approvalReset:
+      !approvedOnHead &&
+      (approvedBy || resetApprovers(discussions, approvals.approved_by).includes(username)),
+    notePath,
+    needsYou: !detail.draft && !mr.draft && !approvedOnHead,
+  };
 }
 
 /** Unresolved threads STARTED by a human reviewer (not a bot, not the MR author). */
@@ -154,6 +225,7 @@ async function laterBranchHealth(projectId, mergePipeline, branchPipelines, heal
 }
 
 import { extractJiraKeys, getEpicMembers, jiraUrl, resolveEpicByJira } from './jira.mjs';
+import { findReviewNotes } from './review-notes.mjs';
 
 // Branch-name shapes used by Epic wave work, for MRs that carry no ticket key.
 // Branch-name patterns that mark an MR as part of the epic; empty disables.
@@ -232,13 +304,19 @@ function baseCard(mr, epicMembers) {
 }
 
 export async function fetchOpenCards() {
-  const [open, epicMembers] = await Promise.all([
-    // GitLab only recomputes has_conflicts when asked; without this it stays stale for days.
-    listMyMergeRequests({ state: 'opened', with_merge_status_recheck: true }),
+  // GitLab only recomputes has_conflicts when asked; without this it stays stale for days.
+  const openParams = { state: 'opened', with_merge_status_recheck: true };
+  const username = REVIEW_AUTHORS.size > 0 ? (await me()).username : null;
+  const [mine, forReview, epicMembers] = await Promise.all([
+    listMyMergeRequests(openParams),
+    username ? listReviewMergeRequests(openParams, username) : [],
     getEpicMembers(),
   ]);
+  const open = new Map(mine.map((mr) => [`${mr.project_id}!${mr.iid}`, mr]));
+  for (const mr of forReview) open.set(`${mr.project_id}!${mr.iid}`, mr);
+  const reviewNotes = username ? findReviewNotes() : new Map();
   const cards = await Promise.all(
-    open.map(async (mr) => {
+    [...open.values()].map(async (mr) => {
       const pid = mr.project_id;
       const [detail, approvals, discussions, blocks] = await Promise.all([
         gl(`/projects/${pid}/merge_requests/${mr.iid}`),
@@ -278,6 +356,13 @@ export async function fetchOpenCards() {
         inMergeTrain: Boolean(
           detail.merge_when_pipeline_succeeds || detail.auto_merge_enabled,
         ),
+        // Set only for a review author's MR where you are assignee or reviewer.
+        yourReview:
+          username &&
+          REVIEW_AUTHORS.has(mr.author?.username) &&
+          [...(detail.assignees ?? []), ...(detail.reviewers ?? [])].some((u) => u.username === username)
+            ? yourReviewState({ mr, detail, approvals, discussions, username, reviewNotes })
+            : null,
       };
     }),
   );

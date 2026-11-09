@@ -18,9 +18,10 @@ import {
   sessionStatus,
 } from './claude.mjs';
 import { classify, COLUMNS } from './classify.mjs';
-import { assertToken, fetchMergedCards, fetchOpenCards } from './gitlab.mjs';
+import { assertToken, fetchMergedCards, fetchOpenCards, REVIEW_AUTHORS } from './gitlab.mjs';
 import { addWorklog, getLoggedTime, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
+import { REVIEW_NOTES_DIR } from './review-notes.mjs';
 import { record, report } from './usage.mjs';
 
 // MRT_LINK_BROWSER="Google Chrome" opens the board's links in that app (useful when the board runs
@@ -32,6 +33,9 @@ const HIDDEN = (process.env.MRT_HIDE ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+// The Your review tray: on when MRT_REVIEW_AUTHORS names someone. Hiding it puts those MRs back
+// in the columns.
+const REVIEW_TRAY = REVIEW_AUTHORS.size > 0 && !HIDDEN.includes('review');
 import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
@@ -203,7 +207,19 @@ app.get('/api/board', (_req, res) => {
     epicKey: process.env.FOCUSED_EPIC_KEY ?? '',
     epicLabel: process.env.FOCUSED_EPIC_LABEL || 'FOCUS',
     hidden: HIDDEN,
+    reviewTray: REVIEW_TRAY,
+    reviewNotes: Boolean(REVIEW_NOTES_DIR),
     linkBrowser: Boolean(LINK_BROWSER),
+  });
+});
+
+// Your saved review for a tray MR, as plain text. Only paths found by the notes scan are served.
+app.get('/api/review-note', (req, res) => {
+  const path = state.cards[String(req.query.key ?? '')]?.yourReview?.notePath;
+  if (!path) return res.status(404).send('No saved review for this MR head.');
+  // Notes folders often sit under a dot-folder such as ~/.claude; sendFile refuses those by default.
+  res.type('text/plain; charset=utf-8').sendFile(path, { dotfiles: 'allow' }, (err) => {
+    if (err && !res.headersSent) res.status(404).send('Review file is gone.');
   });
 });
 
@@ -285,7 +301,7 @@ function openBlockersFor(card, cards) {
 function reclassify(cards) {
   for (const card of Object.values(cards)) {
     card.openBlockers = card.state === 'merged' ? [] : openBlockersFor(card, cards);
-    card.autoColumn = classify(card);
+    card.autoColumn = classify(card, { reviewTray: REVIEW_TRAY });
   }
 }
 

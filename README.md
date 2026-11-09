@@ -33,6 +33,9 @@ things follow from that, and both matter if your setup differs:
   asked for them, so set `MRT_MR_SCOPE=assigned_to_me` (or `both`) to see them. An agent
   MR with no assignee is invisible to the board either way; add yourself as assignee in
   GitLab and it shows up on the next sync.
+- **MRs an agent builds for you to approve.** If an agent account opens MRs that you approve
+  yourself, name it in `MRT_REVIEW_AUTHORS`. Its MRs where you are assignee or reviewer leave
+  the columns for the **Your review** tray. See "Your review tray" below.
 - **Where the Time tab looks.** It reads Claude Code session logs and git history on this
   machine to propose Jira worklogs. If your agents run remotely, the board still works
   (it only talks to GitLab), but the Time tab will see nothing. That could be adapted to
@@ -186,6 +189,27 @@ Enter total hours, hit **Distribute** (15-minute rounding), adjust, then **Log t
 Confirm**. Nothing is written without the confirm step, and no comment body is attached.
 Reading and writing worklogs need `JIRA_EMAIL` + `JIRA_API_TOKEN`.
 
+## Your review tray
+
+Some agents build MRs that you then approve yourself, so your approval is the only review they
+get. List those authors in `MRT_REVIEW_AUTHORS` (comma-separated; empty by default, which turns
+the tray off). Every open MR they authored where you are the assignee or a reviewer sits in the
+**Your review** tray under the board instead of a column, so nothing shows twice. Your own MRs
+are unaffected, and the tray finds reviewer-only MRs whatever `MRT_MR_SCOPE` says.
+
+Each row shows the pipeline dot, the ref and title (both link to the MR), Draft or ready, the
+pipeline status, the author's own AI review verdict and issue count (the same format as
+`MRT_BOT_USERS` reviews), and whether you have approved. Set `MRT_REVIEW_NOTES_DIR` to a folder
+where you save your own reviews as `mr-review-<iid>-<sha8>.md` (any depth), and each row also
+says whether your review exists for the current head: `our review: saved` opens the file, `our
+review: not yet` means no file matches the head sha. Unset, that chip is hidden.
+
+An MR needs you when it is ready (not Draft) and you haven't approved its current head. A push
+after your approval counts as unapproved even when GitLab keeps the approval, and the row then
+shows `re-approve`. While any MR needs you, a red dot sits on the tray's toggle, open or
+collapsed; at zero there is no dot. `MRT_HIDE=review` hides the tray and puts those MRs back in
+the columns.
+
 ## Feature usage and hiding
 
 The tracker counts how often you use each feature (tabs, search, sort, card tools, trays, quick
@@ -194,7 +218,7 @@ actions, the cheat sheet) in `data/usage.json`, which never leaves your machine.
 spot what you never touch.
 
 Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
-`sessions`, `chains`, `time` (tabs), `search`, `sort`, `todos`, `merged` (trays), and the card
+`sessions`, `chains`, `time` (tabs), `search`, `sort`, `todos`, `merged`, `review` (trays), and the card
 tools `important`, `review-request`, `claude`, `links`, `notes`.
 
 ## Setup
@@ -243,6 +267,8 @@ The rest:
 | `MRT_CHEATSHEET_FILE` | — | A text or Markdown file shown, collapsed, under the quick actions (a personal cheat sheet, notes on background jobs). |
 | `MRT_OPEN_IN` | `terminal` | `vscode` opens sessions in a Claude Code tab in VS Code. New sessions (card prompts, quick actions) open a tab with the prompt filled in; press Enter to start, and the tracker links the session to its card once it appears. A background job that is still running opens in Terminal, since only a terminal can attach to it. |
 | `MRT_LINK_BROWSER` | — | A macOS app name, e.g. `"Google Chrome"`. Links on the board (MRs, Jira, pipelines) open in that app, which helps when the board runs inside VS Code's browser. |
+| `MRT_REVIEW_AUTHORS` | — | Comma-separated authors (usually an agent account) whose MRs you approve yourself; their MRs assigned to you or awaiting your review go to the Your review tray. Empty turns the tray off. |
+| `MRT_REVIEW_NOTES_DIR` | — | Where you save your own reviews as `mr-review-<iid>-<sha8>.md`, at any depth. Set it to show the "our review" chip in the Your review tray. |
 | `MRT_HIDE` | — | Comma-separated features to hide, e.g. `chains,time,todos` (see Feature usage and hiding). |
 | `MRT_DEV_ROOT`, `MRT_GIT_AUTHOR`                              | `~/dev`, git email   | Where the Time tab looks for repos and which commits count as yours.                                   |
 | `MRT_PORT`                                                    | `4178`               | Server port.                                                                                           |
