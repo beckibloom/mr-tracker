@@ -224,6 +224,15 @@ const ClaudePrompt = ({ onLaunch, onDone, presets = [], onPreset }) => {
   );
 };
 
+const ImportantIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="4" y="2" width="5" height="14" rx="2.5" />
+    <circle cx="6.5" cy="20" r="2.5" />
+    <rect x="15" y="2" width="5" height="14" rx="2.5" />
+    <circle cx="17.5" cy="20" r="2.5" />
+  </svg>
+);
+
 const LinkIcon = () => (
   <svg
     width="11"
@@ -473,6 +482,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
     onOpenClaude,
     launcherActions = [],
     onLaunchAction,
+    onSetImportant,
     hidden = new Set(),
   } = useContext(BoardContext);
   const session = card.claudeSession;
@@ -482,6 +492,7 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
 
   const classes = ['card'];
   if (card.epic) classes.push('card--epic');
+  if (card.important) classes.push('card--important');
   if (signals.status) classes.push(`card--${signals.status}`);
   if (signals.heat) classes.push(`card--heat-${signals.heat}`);
   if (searchSet) classes.push(searchSet.has(card.key) ? 'card--search-hit' : 'card--dim');
@@ -523,6 +534,18 @@ const Card = ({ card, onClearOverride, onSaveNote }) => {
           </a>
         )}
         <span className="card-tools">
+          {onSetImportant && card.state !== 'merged' && !hidden.has('important') && (
+            <button
+              className={`card-tool${card.important ? ' card-tool--important' : ''}`}
+              {...stopDrag}
+              onClick={() => onSetImportant(card.key, !card.important)}
+              aria-pressed={card.important}
+              title={card.important ? 'Important · click to clear' : 'Mark as important'}
+              aria-label="Important"
+            >
+              <ImportantIcon />
+            </button>
+          )}
           {card.state !== 'merged' && !hidden.has('review-request') && (
             <CopyReviewRequest card={card} />
           )}

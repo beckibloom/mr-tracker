@@ -308,6 +308,12 @@ body {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--epic-accent) 25%, transparent);
 }
 
+/* MRs marked important (‼) get a bold red border; it wins over the epic border */
+.card--important {
+  border: 3px solid var(--gl-red-500);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gl-red-500) 30%, transparent);
+}
+
 .epic-badge {
   position: absolute;
   top: -8px;
@@ -876,6 +882,12 @@ body {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.card-tool--important,
+.card-tool--important:hover {
+  opacity: 1;
+  color: var(--gl-red-500);
 }
 
 .card-tool--done,

@@ -124,6 +124,16 @@ const App = () => {
     await load();
   };
 
+  const setImportant = async (key, important) => {
+    track('card:important');
+    await fetch('/api/important', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, important }),
+    });
+    await load();
+  };
+
   const addLink = async (from, to, type) => {
     track('card:link');
     await fetch('/api/links', {
@@ -253,6 +263,7 @@ const App = () => {
     onAddLink: addLink,
     onRemoveLink: removeLink,
     onDismissSuggestion: dismissSuggestion,
+    onSetImportant: setImportant,
     onLaunchClaude: launchClaude,
     onOpenClaude: openClaude,
     launcherActions,

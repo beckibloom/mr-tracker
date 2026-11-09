@@ -73,7 +73,7 @@ in Agent iteration until you drag it.
 ## What's on a card
 
 ```
-● FE!1234 ⧉  ⌗             📣 ⛓ +  2h    pipeline dot · copyable ref · Jira · tools · age
+● FE!1234 ⧉  ⌗             ‼ 📣 ⛓ + 2h    pipeline dot · copyable ref · Jira · tools · age
 feat(APP-123): move the modal to the        title (full, wraps; hover for the raw title)
 new design system
 [feedback · 2] [agent: 3 issues]           status chips the column doesn't already imply
@@ -89,7 +89,7 @@ waiting on Sam's review                    your note
   whenever the branch conflicts with its target (click it to open the MR), `feedback · N` for unresolved
   threads from humans, AI issue counts, `approved` outside the Approved column,
   `auto-merge` while approvals are outstanding, and `manual ×` for an override.
-- **Tools** (right of the header, bright on hover): the megaphone copies a Slack-ready
+- **Tools** (right of the header, bright on hover): `‼` marks the MR important (bold red border; click again to clear; cleared when it merges), the megaphone copies a Slack-ready
   review request (`:merge-request: <title> <url>`, title prefixes stripped), the chain
   link links to another MR, `+` adds a note. Notes are one line, click to edit, × to clear.
 - MRs in the epic you're most focused on get a purple border and a `FOCUS` badge (see
@@ -195,7 +195,7 @@ spot what you never touch.
 
 Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
 `sessions`, `chains`, `time` (tabs), `search`, `sort`, `todos`, `merged` (trays), and the card
-tools `review-request`, `claude`, `links`, `notes`.
+tools `important`, `review-request`, `claude`, `links`, `notes`.
 
 ## Setup
 

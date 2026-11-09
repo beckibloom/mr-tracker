@@ -17,6 +17,7 @@ export const FEATURES = {
   refresh: 'Refresh button',
   'card:drag': 'Dragging a card to another column',
   'card:note': 'Card notes',
+  'card:important': 'Marking an MR important (‼)',
   'card:link': 'Linking MRs (blocks / follows)',
   'card:dismiss-suggestion': 'Dismissing a suggested link',
   'card:copy-review-request': 'Copy review-request message (megaphone)',

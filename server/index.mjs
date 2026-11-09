@@ -50,6 +50,7 @@ delete state.shared;
 const COLUMN_IDS = new Set(COLUMNS.map((c) => c.id));
 state.todos ??= [];
 state.notes ??= {};
+state.important ??= {};
 state.links ??= [];
 state.dismissed ??= {};
 state.claudeSessions ??= {};
@@ -80,6 +81,9 @@ async function sync() {
     }
     for (const key of Object.keys(state.notes)) {
       if (!cards[key]) delete state.notes[key];
+    }
+    for (const key of Object.keys(state.important)) {
+      if (!cards[key] || cards[key].state === 'merged') delete state.important[key];
     }
     state.links = state.links.filter((l) => cards[l.from] && cards[l.to]);
     for (const key of Object.keys(state.claudeSessions)) {
@@ -182,6 +186,7 @@ app.get('/api/board', (_req, res) => {
     column: state.overrides[card.key]?.column ?? card.autoColumn,
     overridden: Boolean(state.overrides[card.key]),
     note: state.notes[card.key] ?? '',
+    important: Boolean(state.important[card.key]),
     suggestions: suggestionsFor(card),
     claudeSession: withStatus(state.claudeSessions[card.key]),
   }));
@@ -251,6 +256,16 @@ app.post('/api/note', (req, res) => {
   else delete state.notes[key];
   saveState(state);
   res.json({ ok: true, note });
+});
+
+app.post('/api/important', (req, res) => {
+  const { key } = req.body ?? {};
+  if (!state.cards[key]) return res.status(404).json({ error: `Unknown card ${key}` });
+  const important = Boolean(req.body?.important);
+  if (important) state.important[key] = true;
+  else delete state.important[key];
+  saveState(state);
+  res.json({ ok: true, important });
 });
 
 /** Unmerged MRs a card waits on, from board links and GitLab's dependency field. */
