@@ -99,8 +99,11 @@ export async function glAll(path, params = {}) {
   return all;
 }
 
-/** Latest non-outdated agent review comment, parsed. */
-function parseAgentReview(discussions) {
+/**
+ * Latest non-outdated agent review comment, parsed. Clean means what /request-reviews requires:
+ * verdict APPROVE, zero issues, no Recommendations items, and published on the head commit.
+ */
+function parseAgentReview(discussions, headSha) {
   let latest = null;
   for (const d of discussions) {
     for (const n of d.notes ?? []) {
@@ -111,15 +114,32 @@ function parseAgentReview(discussions) {
       if (!latest || n.created_at > latest.created_at) latest = n;
     }
   }
-  if (!latest) return { reviewed: false, clean: false, issueCount: null, verdict: null, at: null };
+  if (!latest) {
+    return {
+      reviewed: false,
+      clean: false,
+      issueCount: null,
+      recommendationCount: null,
+      verdict: null,
+      onHead: false,
+      at: null,
+    };
+  }
 
-  const counts = latest.body.match(/AI_REVIEW_COUNTS critical=(\d+) major=(\d+) minor=(\d+)/);
+  const body = latest.body;
+  const counts = body.match(/AI_REVIEW_COUNTS critical=(\d+) major=(\d+) minor=(\d+)/);
   const issueCount = counts ? Number(counts[1]) + Number(counts[2]) + Number(counts[3]) : null;
-  const assessment = latest.body.match(/\*\*Overall Assessment\*\*:?\s*([A-Za-z_ ]+)/);
+  const assessment = body.match(/\*\*Overall Assessment\*\*:?\s*([A-Za-z_ ]+)/);
   const verdict = assessment ? assessment[1].trim().toUpperCase() : null;
-  // "Any issues at all (even minor)" keeps the MR in agent iteration.
-  const clean = issueCount === 0 && (verdict === null || verdict.startsWith('APPROVE'));
-  return { reviewed: true, clean, issueCount, verdict, at: latest.created_at };
+  const recs = body.match(/### Recommendations\s*([\s\S]*?)(?:\n---|\n### |$)/);
+  const recommendationCount = recs ? (recs[1].match(/^\s*(?:[-*]|\d+\.)\s+\S/gm) ?? []).length : 0;
+  const sha = (body.match(/AI_REVIEW_PUBLISHED (?:[a-z]+ )?([0-9a-f]{7,40})/) ??
+    body.match(/Review commit: ([0-9a-f]{7,40})/))?.[1];
+  // A push after the review means the bot has not looked at what would be shared.
+  const onHead = Boolean(sha && headSha?.startsWith(sha));
+  const clean =
+    issueCount === 0 && verdict?.startsWith('APPROVE') === true && recommendationCount === 0 && onHead;
+  return { reviewed: true, clean, issueCount, recommendationCount, verdict, onHead, at: latest.created_at };
 }
 
 /**
@@ -515,7 +535,7 @@ export async function fetchOpenCards() {
         reviewRequestedAt: latestSystemNote(discussions, (n) => /^requested review from/i.test(n.body ?? '')),
         headSha: detail.sha ?? mr.sha ?? null,
         pipeline,
-        agentReview: parseAgentReview(discussions),
+        agentReview: parseAgentReview(discussions, detail.sha ?? mr.sha),
         unresolvedHumanThreads: countUnresolvedHumanThreads(discussions, mr.author?.username),
         reviewerCount: (detail.reviewers ?? []).filter((r) => !isBot(r.username ?? '')).length,
         approvalsMet:

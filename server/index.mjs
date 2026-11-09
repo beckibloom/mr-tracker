@@ -546,10 +546,13 @@ function cardBrief(card, userPrompt) {
   ];
   if (card.jiraKey) lines.push(`- Jira: ${card.jiraKey}${card.jiraUrl ? ` (${card.jiraUrl})` : ''}`);
   if (card.agentReview?.reviewed) {
-    lines.push(
-      `- AI review: ${card.agentReview.clean ? 'clean' : `${card.agentReview.issueCount ?? '?'} open issue(s)`}` +
-        (card.agentReview.verdict ? `, verdict ${card.agentReview.verdict}` : ''),
-    );
+    const r = card.agentReview;
+    const open = [
+      `${r.issueCount ?? '?'} open issue(s)`,
+      r.recommendationCount ? `${r.recommendationCount} recommendation(s)` : null,
+      r.onHead ? null : 'not on the head commit',
+    ].filter(Boolean);
+    lines.push(`- AI review: ${r.clean ? 'clean' : open.join(', ')}` + (r.verdict ? `, verdict ${r.verdict}` : ''));
   } else if (card.state !== 'merged') {
     lines.push('- AI review: none yet');
   }
