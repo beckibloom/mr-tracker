@@ -2487,5 +2487,22 @@ a.review-note:hover {
 :root[data-theme='dark'] .pace-sub--warn { color: var(--gl-orange-300); }
 
 .dash-section .todo-tray { background: transparent; border-top: none; }
+
+.dash-heading {
+  margin: 0;
+  padding: 0.75rem 1.25rem 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dash-section .launch {
+  margin: 0;
+  padding-top: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+}
 .pace-bar--partial.pace-bar--good { box-shadow: inset 0 0 0 2px var(--gl-green-500); background: transparent; }
 .pace-bar--over { border-top: 3px double var(--surface); }

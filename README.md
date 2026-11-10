@@ -134,10 +134,10 @@ Agents and scripts can park a card themselves before they start:
 ## Dashboard
 
 The first tab is home: the velocity banner (see Pace header) on top, then the Your move strip,
-the Your review tray and the To-do list as open sections, and the Staged tray while anything is
-staged. Clicking a ref in Your move opens the MRs tab on that card. The MRs tab is the
-kanban alone, with the merged tray under it. The Dashboard tab's count is the number of MRs
-waiting on you.
+the Your review tray and the To-do list as open sections, the Staged tray while anything is
+staged, and Quick actions last (see Claude sessions). Clicking a ref in Your move opens the MRs
+tab on that card. The MRs tab is the kanban alone, with the merged tray under it. The Dashboard
+tab's count is the number of MRs waiting on you.
 
 ## Pace header
 
@@ -357,10 +357,10 @@ first, with its project, first prompt (your typed prompt and the MR ref for boar
 ones) and a busy/idle badge for background jobs. Clicking a row opens it in Terminal the
 same way: attach if it's a background job, resume otherwise.
 
-**Quick actions** sit above the session list: one row per saved prompt, each with a **Start**
-button that launches the session and opens it in Terminal. A row whose prompt needs input gets
-a text box, or an MR picker that searches your open cards. Picking a card's MR starts the
-session in that MR's checkout with the card brief, like the card's own Claude button. The same
+**Quick actions** are the Dashboard's last section: one row per saved prompt, each with a
+**Start** button that launches the session and opens it in Terminal. A row whose prompt needs
+input gets a text box, or an MR picker that searches your open cards. Picking a card's MR starts
+the session in that MR's checkout with the card brief, like the card's own Claude button. The same
 MR actions appear as one-click chips under a card's Claude prompt. Define the actions in a JSON
 file (`MRT_LAUNCHER_FILE`, default `~/.mr-tracker/launcher.json`); `{input}` in a prompt is
 replaced with what you typed or picked:
@@ -438,9 +438,9 @@ spot what you never touch.
 
 Hide a feature without removing it by listing it in `MRT_HIDE` (comma-separated) and restarting:
 `sessions`, `chains`, `time`, `program` (tabs), `pace` (header), `search`, `sort`, `yourmove`
-(strip, turn labels, Dim others), `todos`, `merged`, `review`, `staged` (trays), the chips
-`lanes` and `aging`, and the card
-tools `important`, `review-request`, `claude`, `links`, `notes`.
+(strip, turn labels, Dim others), `todos`, `merged`, `review`, `staged` (trays), `actions`
+(Quick actions), the chips `lanes` and `aging`, and the card tools `important`, `review-request`,
+`claude`, `links`, `notes`.
 
 ## Setup
 
@@ -483,7 +483,7 @@ The rest:
 | `JIRA_EMAIL`, `JIRA_API_TOKEN`                                | —                    | Adds worklog writes, ticket summaries and live epic membership.                                        |
 | `FOCUSED_EPIC_KEY`, `FOCUSED_EPIC_LABEL`, `FOCUSED_EPIC_BRANCH_PATTERNS`, `FOCUSED_EPIC_LABELS` | — | Highlight the epic you're most focused on: members by Jira parent (needs credentials), branch regex, or labels. The label is the badge text (default `FOCUS`). An empty key disables it. |
 | `MRT_CLAUDE_ARGS` | — | Extra `claude` flags for sessions started from a card, e.g. `--model fable --permission-mode auto`. Otherwise sessions use your `~/.claude/settings.json` defaults. |
-| `MRT_LAUNCHER_FILE` | `~/.mr-tracker/launcher.json` | Quick actions for the Sessions tab and card chips (see Claude sessions). |
+| `MRT_LAUNCHER_FILE` | `~/.mr-tracker/launcher.json` | Quick actions for the Dashboard and card chips (see Claude sessions). |
 | `MRT_LAUNCHER_CWD` | home directory | Where quick actions start when they set no `cwd` and no MR was picked. |
 | `MRT_CHEATSHEET_FILE` | — | A text or Markdown file shown, collapsed, under the quick actions (a personal cheat sheet, notes on background jobs). |
 | `MRT_OPEN_IN` | `terminal` | `vscode` opens sessions in a Claude Code tab in VS Code. New sessions (card prompts, quick actions) open a tab with the prompt filled in; press Enter to start, and the tracker links the session to its card once it appears. A background job that is still running opens in Terminal, since only a terminal can attach to it. |

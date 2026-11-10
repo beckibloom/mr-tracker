@@ -548,6 +548,12 @@ const App = () => {
               <StagedTray staged={board.staged} onRemove={removeStaged} defaultOpen />
             </div>
           )}
+          {!hidden.has('actions') && (
+            <div className="dash-section">
+              <h2 className="dash-heading">Quick actions</h2>
+              <LaunchPanel />
+            </div>
+          )}
         </div>
       )}
       {view === 'board' && (
@@ -572,7 +578,6 @@ const App = () => {
       {view === 'program' && <ProgramPanel cardByKey={cardByKey} />}
       {view === 'sessions' && (
         <div className="sessions-view">
-          <LaunchPanel />
           <SessionsPanel onOpen={openClaude} />
         </div>
       )}
