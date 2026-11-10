@@ -85,7 +85,7 @@ Every open card carries a turn, worked out on the server (`whoseTurn` in
 | `blocked`  | Merge conflicts, or an open blocker                                                                    |
 | `ci`       | Pipeline running, or in the merge train                                                                |
 | `reviewer` | Waiting for approval                                                                                   |
-| `author`   | Someone else's Your review MR that doesn't need you: a Draft, or one you approved on its head          |
+| `author`   | Someone else's Your review MR that doesn't need you: a Draft, one you approved on its head, or one with your comments posted and no push or reply since |
 | `agent`    | Agent iteration, Draft, anything else. Two agent turns carry a reason, because an agent can clear them without asking: a red pipeline whose only failures are known flakes (`MRT_FLAKY_JOBS`), and an approved MR the merge train dropped |
 
 Every other turn also carries the next step as an instruction, so a card waiting on someone
@@ -458,7 +458,12 @@ an agent is already on the MR, the button stays hidden.
 
 An MR needs you when it is ready (not Draft) and you haven't approved its current head. A push
 after your approval counts as unapproved even when GitLab keeps the approval, and the row then
-shows `re-approve`. While any MR needs you, a red dot sits on the tray's toggle, open or
+shows `re-approve`. Comments you post also hand the move to the author: once your newest
+comment is newer than the newest push, the MR leaves Your move and reads "comments posted:
+wait for @author to push or reply". It comes back when the author pushes, or (for anyone but a
+review author, who answers with a push) replies in a thread you commented in or mentions you.
+A saved review that says approve keeps the MR in Your move, since the approval is still yours.
+While any MR needs you, a red dot sits on the tray's toggle, open or
 collapsed; at zero there is no dot. `MRT_HIDE=review` hides the tray, puts a review author's
 MRs back in the columns and drops everyone else's.
 

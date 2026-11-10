@@ -504,7 +504,8 @@ async function chromaticWait(projectId, sha, pipelineId) {
 /**
  * Where a review-author MR stands for you: your approval on the current head (a push after your
  * approval, or a push that reset it, means approve again) and whether your own saved review
- * matches the head sha. `needsYou`: ready (not Draft) and not approved by you on the head.
+ * matches the head sha. `needsYou`: ready (not Draft), not approved by you on the head, and no
+ * comments of yours waiting on the author (`feedbackAt`).
  */
 function yourReviewState({ mr, detail, approvals, discussions, username, reviewNotes }) {
   const approvedBy = (approvals.approved_by ?? []).some((a) => a.user?.username === username);
@@ -519,12 +520,20 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
   const readyAt = latestSystemNote(discussions, (n) => /^marked this merge request as \*\*ready\*\*/i.test(n.body ?? ''));
   // Waiting on you since the newest push or un-drafting, whichever came last.
   const since = [pushedAt, readyAt, mr.created_at].filter(Boolean).sort().pop();
+  const author = mr.author?.username ?? '';
+  // A review author built it for you, so you also merge it; anyone else merges their own MR.
+  const byReviewAuthor = REVIEW_AUTHORS.has(author);
+  const verdict = notePath ? noteVerdict(notePath) : null;
+  // Comments you posted after the newest push hand the move to the author, unless our review
+  // says approve: then the approval is still yours to give.
+  const feedbackAt =
+    verdict === 'approve' ? null : feedbackOutAt(discussions, username, author, pushedAt, byReviewAuthor);
   return {
     since,
-    noteVerdict: notePath ? noteVerdict(notePath) : null,
-    author: mr.author?.username ?? '',
-    // A review author built it for you, so you also merge it; anyone else merges their own MR.
-    byReviewAuthor: REVIEW_AUTHORS.has(mr.author?.username),
+    noteVerdict: verdict,
+    author,
+    byReviewAuthor,
+    feedbackAt,
     headSha: sha.slice(0, 8),
     approved: approvedOnHead,
     // You approved an earlier head, or a push reset your approval.
@@ -532,8 +541,33 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
       !approvedOnHead &&
       (approvedBy || resetApprovers(discussions, approvals.approved_by).includes(username)),
     notePath,
-    needsYou: !detail.draft && !mr.draft && !approvedOnHead,
+    needsYou: !detail.draft && !mr.draft && !approvedOnHead && !feedbackAt,
   };
+}
+
+/**
+ * When your newest comment went out, if the next step is now the author's: no push since, and
+ * (for a human author) no reply to you since. A review author answers with a push, so only a
+ * push brings its MR back; its own bot chatter in your thread doesn't.
+ */
+function feedbackOutAt(discussions, username, author, pushedAt, byReviewAuthor) {
+  const notes = (d) => (d.notes ?? []).filter((n) => !n.system);
+  const yourAt = discussions
+    .flatMap(notes)
+    .filter((n) => n.author?.username === username)
+    .reduce((at, n) => (!at || n.created_at > at ? n.created_at : at), null);
+  if (!yourAt || (pushedAt && pushedAt > yourAt)) return null;
+  if (byReviewAuthor) return yourAt;
+  const mention = new RegExp(`@${username}\\b`, 'i');
+  const replied = discussions.some((d) => {
+    const ns = notes(d);
+    const yourThread = ns.some((n) => n.author?.username === username);
+    return ns.some(
+      (n) =>
+        n.author?.username === author && n.created_at > yourAt && (yourThread || mention.test(n.body ?? '')),
+    );
+  });
+  return replied ? null : yourAt;
 }
 
 /** Whether an MR belongs in the Your review tray (see fetchOpenCards). */

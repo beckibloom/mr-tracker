@@ -125,6 +125,10 @@ export function whoseTurn(card, column = card.autoColumn) {
     }
     return you(`review, then ${chromaticFirst}approve ${author}'s MR${also}`);
   }
+  // Your comments are out on someone else's MR: the author pushes or replies next.
+  if (card.yourReview?.feedbackAt && !card.draft) {
+    return wait('author', `comments posted: wait for @${card.yourReview.author} to push or reply`);
+  }
   // A pipeline held only by Chromatic waits for a person there, whoever's MR it is.
   if (card.chromatic && !card.draft) return you(chromaticStep(card.chromatic));
   // Someone else's MR you reviewed or approved: its next step is the author's, not yours.
