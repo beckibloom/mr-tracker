@@ -42,7 +42,27 @@ const ReminderRow = ({ reminder, next = false }) => (
   </li>
 );
 
-const Row = ({ card, onReveal, extra, reason }) => (
+// The first slash command a reason names ("run /mr-review, then approve…" → "mr-review").
+const SKILL_RE = /(?:^|[\s(])\/([a-z][a-z0-9-]*(?::[a-z0-9-]+)?)\b/;
+const skillIn = (...texts) => texts.map((t) => t && SKILL_RE.exec(t)?.[1]).find(Boolean) ?? null;
+
+// Starts a Claude session for the card with the skill and the MR filled in, like a quick action.
+const SkillButton = ({ card, skill, onLaunchSkill }) => {
+  if (!skill || !onLaunchSkill) return null;
+  const prompt = `/${skill} ${card.webUrl}`;
+  return (
+    <button
+      type="button"
+      className="btn btn--small yourmove-skill"
+      onClick={() => onLaunchSkill(card.key, prompt)}
+      title={`Start a Claude session: ${prompt}`}
+    >
+      /{skill}
+    </button>
+  );
+};
+
+const Row = ({ card, onReveal, extra, reason, onLaunchSkill }) => (
   <li className={`yourmove-row${card.important ? ' yourmove-row--important' : ''}${reason ? ' yourmove-row--watch' : ''}`}>
     {card.column === 'review' ? (
       <span className="copy-ref yourmove-ref" title="In the Your review tray">
@@ -65,6 +85,11 @@ const Row = ({ card, onReveal, extra, reason }) => (
     <span className="yourmove-reason" title={card.importantInfo?.reason ?? undefined}>
       {reason ?? card.turnReason}
     </span>
+    <SkillButton
+      card={card}
+      skill={skillIn(reason ?? card.turnReason, card.importantInfo?.reason)}
+      onLaunchSkill={onLaunchSkill}
+    />
     {extra}
   </li>
 );
@@ -86,7 +111,15 @@ const HandoffButton = ({ card, onHandoff }) =>
     </button>
   ) : null;
 
-const YourMoveStrip = ({ cards, onReveal, requestReviews, onHandoff, reminders = [], section = false }) => {
+const YourMoveStrip = ({
+  cards,
+  onReveal,
+  requestReviews,
+  onHandoff,
+  onLaunchSkill,
+  reminders = [],
+  section = false,
+}) => {
   const [readyOpen, setReadyOpen] = useState(false);
   const [parkedOpen, setParkedOpen] = useState(false);
   const mine = cards
@@ -123,7 +156,15 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, onHandoff, reminders =
       );
       if (readyOpen) {
         for (const r of ready) {
-          rows.push(<Row key={r.key} card={r} onReveal={onReveal} extra={<HandoffButton card={r} onHandoff={onHandoff} />} />);
+          rows.push(
+            <Row
+              key={r.key}
+              card={r}
+              onReveal={onReveal}
+              onLaunchSkill={onLaunchSkill}
+              extra={<HandoffButton card={r} onHandoff={onHandoff} />}
+            />,
+          );
         }
       }
       continue;
@@ -133,6 +174,7 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, onHandoff, reminders =
         key={card.key}
         card={card}
         onReveal={onReveal}
+        onLaunchSkill={onLaunchSkill}
         extra={
           <>
             {card.turnReason === READY && requestReviews}
@@ -149,7 +191,15 @@ const YourMoveStrip = ({ cards, onReveal, requestReviews, onHandoff, reminders =
     .map((c) => {
       const who = TURN_TEXT[c.turn] ?? c.turn;
       const what = c.importantInfo?.reason ?? c.waitReason;
-      return <Row key={c.key} card={c} onReveal={onReveal} reason={`${who}${what ? `: ${what}` : ''}`} />;
+      return (
+        <Row
+          key={c.key}
+          card={c}
+          onReveal={onReveal}
+          onLaunchSkill={onLaunchSkill}
+          reason={`${who}${what ? `: ${what}` : ''}`}
+        />
+      );
     });
 
   // Snapshots on your own MRs waiting for acceptance; accept yours or chase the owner.

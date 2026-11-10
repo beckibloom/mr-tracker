@@ -111,6 +111,11 @@ The **Your move** strip above the columns answers "what next", top to bottom:
 6. `N with an agent ▸`: moves handed to an agent (below), collapsed.
 7. Later reminders.
 
+When a row's next step names a slash command (a ‼ reason such as "run /my-review, then
+approve"), the row gets a button for it: `/my-review` starts a Claude session for that MR with
+`/my-review <MR URL>` filled in, the same way a card's Claude prompt does (with `MRT_OPEN_IN=vscode`, a VS Code tab with the
+prompt ready; press Enter).
+
 Click a ref to scroll to its card, unfolding it if needed; the title opens the MR. With nothing
 to do the strip says "Nothing waiting on you".
 

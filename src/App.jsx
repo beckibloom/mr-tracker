@@ -524,6 +524,10 @@ const App = () => {
                 requestReviews={requestReviews}
                 reminders={board.reminders ?? []}
                 onHandoff={setHandoff}
+                onLaunchSkill={(key, prompt) => {
+                  track('yourmove:skill');
+                  return launchClaude(key, prompt);
+                }}
               />
             </div>
           )}

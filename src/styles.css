@@ -2236,6 +2236,7 @@ a.review-note:hover {
 .yourmove-row--watch .yourmove-reason { color: var(--text-muted); font-style: italic; }
 .yourmove-row--parked .yourmove-ready-toggle { color: var(--text-muted); }
 .yourmove-handoff { flex: none; opacity: 0; }
+.yourmove-skill { flex: none; font-family: var(--gl-font-mono); }
 .yourmove-row:hover .yourmove-handoff,
 .yourmove-handoff:focus-visible { opacity: 1; }
 .yourmove-row--watch .yourmove-handoff { opacity: 1; }

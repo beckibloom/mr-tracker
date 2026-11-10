@@ -24,6 +24,7 @@ export const FEATURES = {
   'yourmove:dim': 'Toggling Dim others',
   'yourmove:handoff': 'Handing a Your move item to an agent',
   'yourmove:take-back': 'Taking a handed-off item back',
+  'yourmove:skill': 'Starting a skill from a Your move row',
   'card:link': 'Linking MRs (blocks / follows)',
   'card:dismiss-suggestion': 'Dismissing a suggested link',
   'card:copy-review-request': 'Copy review-request message (megaphone)',
