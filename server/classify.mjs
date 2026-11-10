@@ -110,10 +110,12 @@ export function whoseTurn(card, column = card.autoColumn) {
   if (card.yourReview?.needsYou) {
     const author = card.yourReview.author;
     // A path or risk rule wants another reviewer besides you (see README "Second human").
-    const also = `${card.lane?.secondHuman ? ', and ask a second reviewer' : ''}${
-      card.chromatic ? `; ${chromaticStep(card.chromatic)}` : ''
-    }`;
-    if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR${also}`);
+    const also = card.lane?.secondHuman ? ', and ask a second reviewer' : '';
+    // Chromatic holds the merge, so it comes first; a change request makes a new build anyway.
+    const chromaticFirst = card.chromatic ? `${chromaticStep(card.chromatic)}, then ` : '';
+    if (card.yourReview.noteVerdict === 'approve') {
+      return you(`our review says approve: ${chromaticFirst}approve ${author}'s MR${also}`);
+    }
     if (card.yourReview.noteVerdict === 'request-changes') {
       return you(
         card.yourReview.byReviewAuthor
@@ -121,7 +123,7 @@ export function whoseTurn(card, column = card.autoColumn) {
           : `our review asks for changes: post its comments for @${author}`,
       );
     }
-    return you(`review, then approve ${author}'s MR${also}`);
+    return you(`review, then ${chromaticFirst}approve ${author}'s MR${also}`);
   }
   // A pipeline held only by Chromatic waits for a person there, whoever's MR it is.
   if (card.chromatic && !card.draft) return you(chromaticStep(card.chromatic));

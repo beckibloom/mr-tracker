@@ -95,7 +95,9 @@ then mark it ready", "wait for the merge train". The turn label's tooltip shows 
 
 A Your review MR's reason follows your saved review (see Your review tray): "our review says
 approve", "our review asks for changes", or "review, then approve" when there is none for the
-head.
+head. When Chromatic holds the pipeline, its step comes before the approval:
+"our review says approve: in Chromatic, accept or deny the snapshot changes (UI Tests), then
+approve". A change request skips it, since the fix starts a new build.
 
 The **Your move** strip above the columns answers "what next", top to bottom:
 
