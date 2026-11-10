@@ -105,7 +105,11 @@ export function whoseTurn(card, column = card.autoColumn) {
     const also = card.lane?.secondHuman ? ', and ask a second reviewer' : '';
     if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR${also}`);
     if (card.yourReview.noteVerdict === 'request-changes') {
-      return you(`our review asks for changes: send them to @${author}`);
+      return you(
+        card.yourReview.byReviewAuthor
+          ? `our review asks for changes: ask @${author} for them`
+          : `our review asks for changes: post its comments for @${author}`,
+      );
     }
     return you(`review, then approve ${author}'s MR${also}`);
   }

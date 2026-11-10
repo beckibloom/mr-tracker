@@ -2080,6 +2080,29 @@ a.review-note:hover {
   text-decoration: none;
 }
 
+/* Full-width second line of a review row: what to do next, with its skill button. */
+.review-next {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-left: 1rem;
+  color: var(--text-muted);
+}
+
+.review-next--you {
+  color: var(--text);
+}
+
+.review-next-label {
+  font-weight: 600;
+}
+
+.review-next-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .todo-body {
   padding: 0 1.25rem 1rem;
 }

@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { shortRef } from '../links.js';
 
+import SkillButton, { skillIn } from './SkillButton.jsx';
+
 const READY = 'request review';
 
 // Short labels for whose move a card waits on (server/classify.mjs whoseTurn).
@@ -41,26 +43,6 @@ const ReminderRow = ({ reminder, next = false }) => (
     </span>
   </li>
 );
-
-// The first slash command a reason names ("run /mr-review, then approve…" → "mr-review").
-const SKILL_RE = /(?:^|[\s(])\/([a-z][a-z0-9-]*(?::[a-z0-9-]+)?)\b/;
-const skillIn = (...texts) => texts.map((t) => t && SKILL_RE.exec(t)?.[1]).find(Boolean) ?? null;
-
-// Starts a Claude session for the card with the skill and the MR filled in, like a quick action.
-const SkillButton = ({ card, skill, onLaunchSkill }) => {
-  if (!skill || !onLaunchSkill) return null;
-  const prompt = `/${skill} ${card.webUrl}`;
-  return (
-    <button
-      type="button"
-      className="btn btn--small yourmove-skill"
-      onClick={() => onLaunchSkill(card.key, prompt)}
-      title={`Start a Claude session: ${prompt}`}
-    >
-      /{skill}
-    </button>
-  );
-};
 
 const Row = ({ card, onReveal, extra, reason, onLaunchSkill }) => (
   <li className={`yourmove-row${card.important ? ' yourmove-row--important' : ''}${reason ? ' yourmove-row--watch' : ''}`}>

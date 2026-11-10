@@ -441,9 +441,13 @@ pipeline status, the author's own AI review verdict and issue count (the same fo
 `MRT_BOT_USERS` reviews), and whether you have approved. Set `MRT_REVIEW_NOTES_DIR` to a folder
 where you save your own reviews as `mr-review-<iid>-<sha8>.md` (any depth), and each row also
 says whether your review exists for the current head: `our review: approve` or `our review:
-changes` (read from the file's bold first line) opens the file, `our review: not yet` means no
+changes` (read from the file's bold first line) opens the file, `our review: not run` means no
 file matches the head sha. Unset, that chip is hidden. The toggle shows the oldest wait, and
 ready MRs your review already cleared sort first.
+
+Under each row, **Next:** names your next step, or **Waiting:** names whose it is. When the step
+names a slash command, a button starts it for that MR, the same as on the Your move strip. While
+an agent is already on the MR, the button stays hidden.
 
 An MR needs you when it is ready (not Draft) and you haven't approved its current head. A push
 after your approval counts as unapproved even when GitLab keeps the approval, and the row then

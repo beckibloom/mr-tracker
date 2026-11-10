@@ -547,7 +547,15 @@ const App = () => {
           )}
           {board.reviewTray && !hidden.has('review') && (
             <div className="dash-section">
-              <ReviewTray cards={forReview} showNotes={board.reviewNotes} defaultOpen />
+              <ReviewTray
+                cards={forReview}
+                showNotes={board.reviewNotes}
+                onLaunchSkill={(key, prompt) => {
+                  track('review:skill');
+                  return launchClaude(key, prompt);
+                }}
+                defaultOpen
+              />
             </div>
           )}
           {!hidden.has('todos') && (

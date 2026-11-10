@@ -4,6 +4,7 @@ import { BoardContext } from '../board-context.js';
 import { shortRef } from '../links.js';
 import { track } from '../track.js';
 
+import SkillButton, { skillIn } from './SkillButton.jsx';
 import StateDot from './StateDot.jsx';
 
 const NeedsDot = ({ count }) =>
@@ -47,8 +48,29 @@ const secondHumanTitle = ({ reasons }) =>
 
 const VERDICT_TEXT = { approve: 'our review: approve', 'request-changes': 'our review: changes' };
 
+// The row's next step (server/classify.mjs whoseTurn). An agent already on it gets no skill button.
+const NextStep = ({ card, onLaunchSkill }) => {
+  if (card.handoff) {
+    return (
+      <div className="review-next">
+        <span className="review-next-label">Agent on it.</span>
+        <span className="review-next-text">Then you: {card.handoff.then}</span>
+      </div>
+    );
+  }
+  const step = card.turn === 'you' ? card.turnReason : card.waitReason;
+  if (!step) return null;
+  return (
+    <div className={`review-next${card.turn === 'you' ? ' review-next--you' : ''}`}>
+      <span className="review-next-label">{card.turn === 'you' ? 'Next:' : 'Waiting:'}</span>
+      <span className="review-next-text">{step}</span>
+      <SkillButton card={card} skill={skillIn(step)} onLaunchSkill={onLaunchSkill} />
+    </div>
+  );
+};
+
 /** MRs you review (yours to approve); a red dot while any is ready and unapproved. */
-const ReviewTray = ({ cards, showNotes, defaultOpen = false }) => {
+const ReviewTray = ({ cards, showNotes, onLaunchSkill, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   const { searchSet } = useContext(BoardContext);
   const revealed = !open && cards.some((c) => searchSet?.has(c.key));
@@ -158,12 +180,13 @@ const ReviewTray = ({ cards, showNotes, defaultOpen = false }) => {
                       ) : (
                         <span
                           className="chip chip--muted"
-                          title={`No mr-review-${card.iid}-${r.headSha}.md for the current head`}
+                          title={`No saved review for the latest push (no mr-review-${card.iid}-${r.headSha}.md)`}
                         >
-                          our review: not yet
+                          our review: not run
                         </span>
                       ))}
                   </span>
+                  <NextStep card={card} onLaunchSkill={onLaunchSkill} />
                 </li>
               );
             })}

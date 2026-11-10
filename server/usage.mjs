@@ -40,6 +40,7 @@ export const FEATURES = {
   'review:open': 'Opening the Your review tray',
   'review:mr': 'Opening an MR from the Your review tray',
   'review:note': 'Opening a saved review from the Your review tray',
+  'review:skill': 'Starting a skill from a Your review row',
 };
 
 let usage = { since: new Date().toISOString(), features: {} };
