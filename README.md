@@ -154,14 +154,18 @@ TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk 
   position (`from '…'`, `import '…'`, `import('…')`, `require('…')`), in `.ts .tsx .js .jsx .mjs
   .cjs` files, skipping `MRT_PACE_EXCLUDE` paths. A file counts once however many packages it
   imports. `MRT_PACE_SPLIT` paths are counted and also shown on their own.
-- **Today and the colour:** files removed since midnight against a daily target
-  (`MRT_PACE_DAILY_TARGET`, default the weekly target ÷ 5). The banner's colour follows today,
+- **Targets:** with `MRT_PACE_GOAL_DATE` set, the daily target is the files left at the start of
+  today ÷ the working days to the goal, today included, so it rises when a day falls short and
+  falls when one runs ahead; the weekly target is that times this week's working days.
+  `MRT_PACE_DAILY_TARGET` and `MRT_PACE_TARGET` override them; without a goal the defaults are 50 a
+  week and a fifth of that a day.
+- **Today and the colour:** files removed since midnight against the daily target. The banner's colour follows today,
   pro-rated over working hours (`MRT_PACE_WORK_HOURS`, default `9-17`): green once today reaches
   the daily target, orange while it is at or above the share expected by now, red when it is
   behind ("N behind: expect M by now"), grey on weekends. Merges land in batches, so a morning
   often reads red until the train delivers.
 - **This week:** files removed since Monday against the weekly target, with met, on track or
-  behind (pro-rated over Monday to Friday).
+  behind (pro-rated over the week's working days).
 - **4-wk avg:** the mean number of files removed per week over the last four whole weeks, Monday to
   Monday. "Removed" is a set difference (files counted last Monday and not this Monday), so code
   moved in from elsewhere doesn't hide a week's progress.

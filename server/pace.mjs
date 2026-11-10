@@ -27,11 +27,15 @@ const SCOPE = process.env.MRT_PACE_SCOPE ?? '';
 const EXCLUDE = csv(process.env.MRT_PACE_EXCLUDE ?? '');
 const SPLIT = process.env.MRT_PACE_SPLIT ?? '';
 const SPLIT_LABEL = process.env.MRT_PACE_SPLIT_LABEL ?? '';
+// Targets: set by hand, or (with a goal date and no hand-set value) derived from the goal: the
+// daily target is the files left at the start of today ÷ working days to the goal, today
+// included, and the weekly target is that times this week's working days.
+const TARGET_SET = Boolean(process.env.MRT_PACE_TARGET);
 const TARGET = Number(process.env.MRT_PACE_TARGET ?? 50);
+const DAILY_SET = Boolean(process.env.MRT_PACE_DAILY_TARGET);
 const LABEL = process.env.MRT_PACE_LABEL ?? 'files';
-// The date the plan promises; the header shows the weekly rate that would meet it.
+// The date to finish by; with it, the targets follow from what's left (see above).
 const GOAL_DATE = process.env.MRT_PACE_GOAL_DATE ?? '';
-// A working day's share of the weekly target (Monday to Friday).
 const DAILY_TARGET = Number(process.env.MRT_PACE_DAILY_TARGET ?? 0) || Math.ceil(TARGET / 5);
 // Working hours for pro-rating today, local time, e.g. 9-17.
 const [DAY_START, DAY_END] = (process.env.MRT_PACE_WORK_HOURS ?? '9-17').split('-').map(Number);
@@ -124,9 +128,28 @@ export function removedBetween(before, after, packages) {
 
 /** How much of the working week (Monday 00:00 to Friday 24:00) has passed, 0 to 1. */
 function weekFraction(d = new Date()) {
-  const day = (d.getDay() + 6) % 7; // Monday 0
-  if (day >= 5) return 1;
-  return Math.min((day + (d.getHours() + d.getMinutes() / 60) / 24) / 5, 1);
+  const days = weekWorkdays(d);
+  if (days.length === 0) return 1;
+  const today = localDate(d);
+  let elapsed = 0;
+  for (const day of days) {
+    if (day < today) elapsed += 1;
+    else if (day === today) elapsed += (d.getHours() + d.getMinutes() / 60) / 24;
+  }
+  return Math.min(elapsed / days.length, 1);
+}
+
+/** This week's working days (Monday to Friday, holidays out), as YYYY-MM-DD. */
+function weekWorkdays(d = new Date()) {
+  const m = mondayOf(d);
+  const out = [];
+  for (let i = 0; i < 5; i++) {
+    const x = new Date(m);
+    x.setDate(x.getDate() + i);
+    x.setHours(12);
+    if (isWorkday(x)) out.push(localDate(x));
+  }
+  return out;
 }
 
 const isWorkday = (d) => (d.getDay() + 6) % 7 < 5 && !HOLIDAYS.has(localDate(d));
@@ -252,13 +275,22 @@ async function compute() {
     perWeek && perWeek > 0
       ? new Date(Date.now() + (now.total / perWeek) * 7 * 24 * 3600 * 1000).toISOString().slice(0, 10)
       : null;
+  // Targets for today and this week (see TARGET_SET above).
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartSha = await shaAt(dayStart);
+  const leftAtDayStart = dayStartSha ? (await census(dayStartSha)).size : now.total;
+  const workdaysFromToday = GOAL_DATE ? workdaysUntil(GOAL_DATE) + (isWorkday(new Date()) ? 1 : 0) : 0;
+  const derivedDaily = GOAL_DATE && workdaysFromToday > 0 ? Math.ceil(leftAtDayStart / workdaysFromToday) : null;
+  const dailyTarget = DAILY_SET || !derivedDaily ? DAILY_TARGET : derivedDaily;
+  const weekTarget = TARGET_SET || !derivedDaily ? TARGET : dailyTarget * Math.max(weekWorkdays().length, 1);
+
   const avgStatus =
-    perWeek == null ? 'unknown' : perWeek >= TARGET ? 'good' : perWeek >= TARGET * 0.8 ? 'warn' : 'bad';
-  // The header's colour is this week against the target, pro-rated over the working week
-  // (Monday to Friday): by Wednesday noon the week should have removed half the target.
-  const expectedByNow = Math.ceil(TARGET * weekFraction());
+    perWeek == null ? 'unknown' : perWeek >= weekTarget ? 'good' : perWeek >= weekTarget * 0.8 ? 'warn' : 'bad';
+  // This week against the weekly target, pro-rated over the week's working days.
+  const expectedByNow = Math.ceil(weekTarget * weekFraction());
   const weekStatus =
-    now.removed == null ? 'unknown' : now.removed >= TARGET ? 'good' : now.removed >= expectedByNow ? 'warn' : 'bad';
+    now.removed == null ? 'unknown' : now.removed >= weekTarget ? 'good' : now.removed >= expectedByNow ? 'warn' : 'bad';
 
   // Daily: files removed each working day (midnight to midnight, or to now for today). The
   // header's colour is today against the daily target, pro-rated over working hours.
@@ -291,11 +323,11 @@ async function compute() {
   // What's left of today counts as part of a day.
   const workdaysToGoal = GOAL_DATE ? workdaysUntil(GOAL_DATE) + (fraction == null ? 0 : 1 - fraction) : null;
   const neededPerDay = workdaysToGoal ? Math.ceil(now.total / Math.max(workdaysToGoal, 0.5)) : null;
-  const expectedToday = fraction == null ? null : Math.ceil(DAILY_TARGET * fraction);
+  const expectedToday = fraction == null ? null : Math.ceil(dailyTarget * fraction);
   const status =
     fraction == null || today.removed == null
       ? 'rest'
-      : today.removed >= DAILY_TARGET
+      : today.removed >= dailyTarget
         ? 'good'
         : today.removed >= expectedToday
           ? 'warn'
@@ -307,7 +339,8 @@ async function compute() {
     splitLabel: SPLIT ? SPLIT_LABEL : null,
     repo: REPO,
     ref: REF,
-    target: TARGET,
+    target: weekTarget,
+    targetSource: TARGET_SET || !derivedDaily ? 'set' : 'goal',
     goalDate: GOAL_DATE || null,
     windowWeeks: WINDOW_WEEKS,
     perWeek,
@@ -315,7 +348,7 @@ async function compute() {
     expectedByNow,
     weekStatus,
     avgStatus,
-    dailyTarget: DAILY_TARGET,
+    dailyTarget,
     perDay,
     perDayWindow: DAYS,
     finishAtDailyRate,
