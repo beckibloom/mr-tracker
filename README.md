@@ -442,6 +442,22 @@ shows `re-approve`. While any MR needs you, a red dot sits on the tray's toggle,
 collapsed; at zero there is no dot. `MRT_HIDE=review` hides the tray and puts those MRs back in
 the columns.
 
+### Second human
+
+Some teams let you approve an agent's MR alone unless it touches code that needs a second
+person. Describe those rules and a `second human` chip marks the tray rows they catch; its
+tooltip names each rule and the paths that matched it, and Your move says to ask a second
+reviewer as well. All three rules are off by default:
+
+- **Paths** in `MRT_SECOND_REVIEW_PATHS`: CODEOWNERS-style globs, each optionally scoped as
+  `group/project:glob`, e.g. `src/shared/**,web/app:config/**`.
+- **CODEOWNERS sections** in `MRT_SECOND_REVIEW_CODEOWNERS`, as `group/project:Section`. The
+  tracker reads that section of the project's `CODEOWNERS` on the MR's target branch, cached for
+  an hour, and treats its paths like the globs above.
+- **Historically risky files**: when a review bot's risk note lists files under a line like
+  `<Heading>: N historically risky file(s) changed`, one `` - `path` `` item each, set
+  `MRT_SECOND_REVIEW_HISTORY_HEADING` to that heading and the newest note's files count too.
+
 ## Feature usage and hiding
 
 The tracker counts how often you use each feature (tabs, search, sort, card tools, trays, quick
@@ -503,6 +519,9 @@ The rest:
 | `MRT_LINK_BROWSER` | — | A macOS app name, e.g. `"Google Chrome"`. Links on the board (MRs, Jira, pipelines) open in that app, which helps when the board runs inside VS Code's browser. |
 | `MRT_REVIEW_AUTHORS` | — | Comma-separated authors (usually an agent account) whose MRs you approve yourself; their MRs assigned to you or awaiting your review go to the Your review tray. Empty turns the tray off. |
 | `MRT_REVIEW_NOTES_DIR` | — | Where you save your own reviews as `mr-review-<iid>-<sha8>.md`, at any depth. Set it to show the "our review" chip in the Your review tray. |
+| `MRT_SECOND_REVIEW_PATHS` | — | Globs (CODEOWNERS syntax, optional `group/project:` scope) that put a `second human` chip on a review author's MR. |
+| `MRT_SECOND_REVIEW_CODEOWNERS` | — | `group/project:Section` pairs: that project's CODEOWNERS section adds its paths. |
+| `MRT_SECOND_REVIEW_HISTORY_HEADING` | — | Heading of a risk note's list of historically risky files, which also need a second human. |
 | `MRT_DEFAULT_SORT` | `epic` | The sort until you pick one in the top bar: `epic`, `unblock` (‼, then the focused epic, then cards that unblock the most open MRs, then idle longest), `newest` or `oldest`. |
 | `MRT_HIDE` | — | Comma-separated features to hide, e.g. `chains,time,todos` (see Feature usage and hiding). |
 | `MRT_PACE_REPO`, `MRT_PACE_SCOPE` | — | Local checkout and package scope the pace header counts. Both are needed; either empty turns it off. |

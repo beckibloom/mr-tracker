@@ -143,6 +143,16 @@ function parseAgentReview(discussions, headSha) {
 }
 
 /**
+ * Files a risk note lists under its "<heading>: N historically risky file(s) changed" line, one
+ * "- `path` — …" item each, up to the first line that is not a list item. Empty heading: none.
+ */
+function historyRiskyFiles(body) {
+  if (!HISTORY_RE) return [];
+  const block = body.match(HISTORY_RE);
+  return block ? [...block[1].matchAll(/^[ \t]*- `([^`\n]+)`/gm)].map((m) => m[1]) : [];
+}
+
+/**
  * The latest risk verdict a review bot posted (`<!-- AI_RISK_VERDICT verdict=… score=N
  * threshold=N -->`), or null. The score decides whether the bot can approve on its own.
  */
@@ -159,6 +169,7 @@ function parseRisk(discussions) {
           score: Number(m[2]),
           threshold: m[3] ? Number(m[3]) : null,
           at: n.created_at,
+          historyRisky: historyRiskyFiles(n.body),
         };
       }
     }
@@ -224,6 +235,136 @@ const CHROMATIC_STATUS = process.env.MRT_CHROMATIC_STATUS ?? 'UI Tests';
 // A build still capturing reads the same as one waiting for acceptance; give it this long.
 const CHROMATIC_GRACE_MS = 30 * 60 * 1000;
 
+// Second human (see README "Second human"): a review author's MR that you could otherwise approve
+// alone still needs another reviewer when it touches these paths. Globs in CODEOWNERS syntax, each
+// optionally scoped to one project as `group/project:glob`.
+const SECOND_REVIEW_PATHS = csv(process.env.MRT_SECOND_REVIEW_PATHS ?? '').map((entry) => {
+  const at = entry.indexOf(':');
+  const [project, glob] = at > 0 ? [entry.slice(0, at), entry.slice(at + 1)] : [null, entry];
+  return { project, glob, re: globToRegExp(glob) };
+});
+// `group/project:Section`: that project's CODEOWNERS section (on the MR's target branch) adds its
+// paths to the list above.
+const SECOND_REVIEW_CODEOWNERS = csv(process.env.MRT_SECOND_REVIEW_CODEOWNERS ?? '').map((entry) => {
+  const at = entry.lastIndexOf(':');
+  return { project: entry.slice(0, at), section: entry.slice(at + 1) };
+});
+// The risk note's heading over its list of historically risky files; those files need a second
+// human too. Empty ignores the list.
+const HISTORY_HEADING = process.env.MRT_SECOND_REVIEW_HISTORY_HEADING ?? '';
+const HISTORY_RE = HISTORY_HEADING
+  ? new RegExp(
+      `${HISTORY_HEADING.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*\\d+ historically risky file[^\\n]*\\n((?:[ \\t]*- \`[^\`\\n]+\`[^\\n]*\\n?)+)`,
+    )
+  : null;
+
+/**
+ * A CODEOWNERS pattern as a RegExp over repo-relative paths (gitignore rules): a leading or
+ * inner `/` anchors it to the root, a trailing `/` means everything under that directory, `*`
+ * stays within one segment and `**` crosses them.
+ */
+function globToRegExp(glob) {
+  let g = glob.trim();
+  const anchored = g.startsWith('/') || g.slice(0, -1).includes('/');
+  g = g.replace(/^\/+/, '');
+  const dir = g.endsWith('/');
+  if (dir) g = g.slice(0, -1);
+  let re = '';
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i];
+    if (c === '*' && g[i + 1] === '*') {
+      if (g[i + 2] === '/') {
+        re += '(?:.*/)?';
+        i += 2;
+      } else {
+        re += '.*';
+        i += 1;
+      }
+    } else if (c === '*') re += '[^/]*';
+    else if (c === '?') re += '[^/]';
+    else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`${anchored ? '^' : '(?:^|/)'}${re}${dir ? '/' : '(?:$|/)'}`);
+}
+
+/** Path patterns in the named CODEOWNERS sections, in order; `!pattern` lines exclude. */
+function codeownersSection(text, section) {
+  const want = section.toLowerCase();
+  const rules = [];
+  let inSection = false;
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const header = line.match(/^\^?\[([^\]]+)\]/);
+    if (header) {
+      inSection = header[1].trim().toLowerCase() === want;
+      continue;
+    }
+    if (!inSection) continue;
+    const pattern = line.match(/^(?:\\.|\S)+/)[0].replace(/\\(.)/g, '$1');
+    const exclude = pattern.startsWith('!');
+    const glob = exclude ? pattern.slice(1) : pattern;
+    rules.push({ glob, exclude, re: globToRegExp(glob) });
+  }
+  return rules;
+}
+
+const CODEOWNERS_TTL_MS = 60 * 60 * 1000;
+const codeownersCache = new Map(); // `${project}@${ref}` -> { at, rules: Promise<rules by section> }
+/** The project's CODEOWNERS sections named in MRT_SECOND_REVIEW_CODEOWNERS, cached for an hour. */
+function codeownersRules(project, ref) {
+  const sections = SECOND_REVIEW_CODEOWNERS.filter((c) => c.project === project).map((c) => c.section);
+  if (sections.length === 0) return Promise.resolve([]);
+  const cacheKey = `${project}@${ref}`;
+  const hit = codeownersCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < CODEOWNERS_TTL_MS) return hit.rules;
+  const rules = (async () => {
+    const pid = encodeURIComponent(project);
+    // GitLab reads the first of these that exists.
+    for (const path of ['CODEOWNERS', 'docs/CODEOWNERS', '.gitlab/CODEOWNERS']) {
+      const file = await gl(`/projects/${pid}/repository/files/${encodeURIComponent(path)}`, { ref }).catch(
+        () => null,
+      );
+      if (!file?.content) continue;
+      const text = Buffer.from(file.content, 'base64').toString('utf8');
+      return sections.map((section) => ({ section, file: path, rules: codeownersSection(text, section) }));
+    }
+    return [];
+  })().catch((err) => {
+    codeownersCache.delete(cacheKey);
+    throw err;
+  });
+  codeownersCache.set(cacheKey, { at: Date.now(), rules });
+  return rules;
+}
+
+/**
+ * Why a review author's MR needs a second human reviewer, or null: the configured paths it
+ * touches, the CODEOWNERS sections it touches, and the files the risk note calls historically
+ * risky. Each reason names its rule and up to five matching paths.
+ */
+async function secondHumanInfo({ project, paths, risk, ref }) {
+  const reasons = [];
+  const add = (rule, matched) => {
+    if (matched.length > 0) reasons.push({ rule, paths: matched.slice(0, 5), count: matched.length });
+  };
+  for (const p of SECOND_REVIEW_PATHS) {
+    if (p.project && p.project !== project) continue;
+    add(p.glob, paths.filter((path) => p.re.test(path)));
+  }
+  for (const { section, file, rules } of await codeownersRules(project, ref).catch(() => [])) {
+    // Within a section the last matching pattern wins, so a later `!pattern` lifts an earlier one.
+    const owned = paths.filter((path) => {
+      let hit = false;
+      for (const r of rules) if (r.re.test(path)) hit = !r.exclude;
+      return hit;
+    });
+    add(`[${section}] in ${file}`, owned);
+  }
+  if (HISTORY_HEADING) add(`${HISTORY_HEADING} (historically risky)`, risk?.historyRisky ?? []);
+  return reasons.length > 0 ? { reasons } : null;
+}
+
 const diffCache = new Map(); // `${key}@${sha}` -> paths
 async function changedPaths(pid, iid, key, sha) {
   const cacheKey = `${key}@${sha}`;
@@ -247,11 +388,19 @@ async function changedPaths(pid, iid, key, sha) {
  * `warn` says how to get an MR of yours into the auto lane when it nearly fits.
  */
 async function laneInfo({ mr, detail, discussions, key, project }) {
+  const sha = detail.sha ?? mr.sha ?? '';
   if (REVIEW_AUTHORS.has(mr.author?.username)) {
-    return { lane: 'agent', files: Number.parseInt(detail.changes_count, 10) || null, risk: parseRisk(discussions) };
+    const risk = parseRisk(discussions);
+    const paths = await changedPaths(mr.project_id, mr.iid, key, sha).catch(() => []);
+    const secondHuman = await secondHumanInfo({
+      project,
+      paths,
+      risk,
+      ref: detail.target_branch ?? mr.target_branch ?? 'main',
+    });
+    return { lane: 'agent', files: Number.parseInt(detail.changes_count, 10) || null, risk, secondHuman };
   }
   if (!LANE_PROJECTS.has(project)) return null;
-  const sha = detail.sha ?? mr.sha ?? '';
   const paths = await changedPaths(mr.project_id, mr.iid, key, sha).catch(() => null);
   const files = paths?.length ?? (Number.parseInt(detail.changes_count, 10) || null);
   const humanPaths = (paths ?? []).filter((p) => LANE_HUMAN_RE?.test(p));

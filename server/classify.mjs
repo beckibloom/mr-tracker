@@ -100,11 +100,13 @@ export function whoseTurn(card, column = card.autoColumn) {
   if (card.state !== 'opened') return { turn: null, turnReason: null, agentReason: null, waitReason: null };
   if (card.yourReview?.needsYou) {
     const author = card.yourReview.author;
-    if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR`);
+    // A path or risk rule wants another reviewer besides you (see README "Second human").
+    const also = card.lane?.secondHuman ? ', and ask a second reviewer' : '';
+    if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR${also}`);
     if (card.yourReview.noteVerdict === 'request-changes') {
       return you(`our review asks for changes: send them to @${author}`);
     }
-    return you(`review, then approve ${author}'s MR`);
+    return you(`review, then approve ${author}'s MR${also}`);
   }
   if (card.hasConflicts || (card.openBlockers?.length ?? 0) > 0) {
     return wait('blocked', blockedReason(card));

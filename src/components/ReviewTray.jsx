@@ -39,6 +39,12 @@ const waitText = (iso) => {
   return m < 24 * 60 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`;
 };
 
+// Why approving alone is not enough (server/gitlab.mjs secondHumanInfo): each rule and its paths.
+const secondHumanTitle = ({ reasons }) =>
+  `Needs a second human reviewer as well as you. ${reasons
+    .map((r) => `${r.rule}: ${r.paths.join(', ')}${r.count > r.paths.length ? ` and ${r.count - r.paths.length} more` : ''}`)
+    .join('; ')}`;
+
 const VERDICT_TEXT = { approve: 'our review: approve', 'request-changes': 'our review: changes' };
 
 /** MRs a review author built for you to approve; a red dot while any is ready and unapproved. */
@@ -112,6 +118,11 @@ const ReviewTray = ({ cards, showNotes, defaultOpen = false }) => {
                     )}
                     {card.lane?.files != null && (
                       <span className="chip chip--muted">{card.lane.files} files</span>
+                    )}
+                    {card.lane?.secondHuman && (
+                      <span className="chip chip--warn" title={secondHumanTitle(card.lane.secondHuman)}>
+                        second human
+                      </span>
                     )}
                     {card.pipeline.url ? (
                       <a

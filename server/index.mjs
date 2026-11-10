@@ -635,6 +635,9 @@ function cardBrief(card, userPrompt) {
         (l.humanPaths?.length ? `, human-only paths: ${l.humanPaths.join(', ')}` : '') +
         (l.warn ? ` — ${l.warn}` : ''),
     );
+    for (const r of l.secondHuman?.reasons ?? []) {
+      lines.push(`- Needs a second human reviewer: ${r.rule} (${r.paths.join(', ')}${r.count > r.paths.length ? ', …' : ''})`);
+    }
   }
   if (card.trainDrop) lines.push(`- Dropped from the merge train ${card.trainDrop.at}${card.trainDrop.reason ? `: ${card.trainDrop.reason}` : ''}`);
   if (card.failedJobs?.names?.length) {
