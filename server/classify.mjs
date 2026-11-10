@@ -93,6 +93,14 @@ function agentWaitReason(card) {
  *
  * `column` is where the card shows (a manual override wins over the automatic column).
  */
+// What a person does in Chromatic for each check that waits (server/gitlab.mjs chromaticWait).
+const CHROMATIC_ACTIONS = {
+  'UI Tests': 'accept or deny the snapshot changes (UI Tests)',
+  'UI Review': 'approve the review (UI Review)',
+};
+export const chromaticStep = (chromatic) =>
+  `in Chromatic, ${chromatic.checks.map((c) => CHROMATIC_ACTIONS[c.name] ?? `clear ${c.name}`).join(' and ')}`;
+
 export function whoseTurn(card, column = card.autoColumn) {
   const you = (turnReason) => ({ turn: 'you', turnReason, agentReason: null, waitReason: null });
   const wait = (turn, waitReason) => ({ turn, turnReason: null, agentReason: null, waitReason });
@@ -102,7 +110,9 @@ export function whoseTurn(card, column = card.autoColumn) {
   if (card.yourReview?.needsYou) {
     const author = card.yourReview.author;
     // A path or risk rule wants another reviewer besides you (see README "Second human").
-    const also = card.lane?.secondHuman ? ', and ask a second reviewer' : '';
+    const also = `${card.lane?.secondHuman ? ', and ask a second reviewer' : ''}${
+      card.chromatic ? `; ${chromaticStep(card.chromatic)}` : ''
+    }`;
     if (card.yourReview.noteVerdict === 'approve') return you(`our review says approve: approve ${author}'s MR${also}`);
     if (card.yourReview.noteVerdict === 'request-changes') {
       return you(
@@ -113,6 +123,8 @@ export function whoseTurn(card, column = card.autoColumn) {
     }
     return you(`review, then approve ${author}'s MR${also}`);
   }
+  // A pipeline held only by Chromatic waits for a person there, whoever's MR it is.
+  if (card.chromatic && !card.draft) return you(chromaticStep(card.chromatic));
   // Someone else's MR you reviewed or approved: its next step is the author's, not yours.
   if (card.yourReview && !card.yourReview.byReviewAuthor) {
     const author = `@${card.yourReview.author}`;

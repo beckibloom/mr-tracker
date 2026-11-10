@@ -185,13 +185,6 @@ const YourMoveStrip = ({
       );
     });
 
-  // Snapshots on your own MRs waiting for acceptance; accept yours or chase the owner.
-  const chromatic = cards
-    .filter((c) => c.chromatic && c.state === 'opened' && !c.important && c.turn !== 'you' && !c.yourReview)
-    .map((c) => (
-      <Row key={`chromatic:${c.key}`} card={c} onReveal={onReveal} reason={`accept Chromatic snapshots · waiting ${ageText(c.chromatic.since)}`} />
-    ));
-
   // Moves an agent holds, out of the way in one collapsed row; each comes back on its own.
   const parked = cards.filter((c) => c.handoff);
   const parkedRows = [];
@@ -244,7 +237,6 @@ const YourMoveStrip = ({
     ...soon.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} />),
     ...rows,
     ...watched,
-    ...chromatic,
     ...parkedRows,
     ...later.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} />),
   ];

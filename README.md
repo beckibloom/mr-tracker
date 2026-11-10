@@ -109,9 +109,8 @@ The **Your move** strip above the columns answers "what next", top to bottom:
 4. ‼ cards whose move is someone else's, with who holds it and the flag's reason, or the
    turn's next step when the flag has none ("blocked: merge !972 first"). A ‼ never
    leaves the strip just because it waits on a person or CI.
-5. Your MRs whose Chromatic snapshots wait for acceptance.
-6. `N with an agent ▸`: moves handed to an agent (below), collapsed.
-7. Later reminders.
+5. `N with an agent ▸`: moves handed to an agent (below), collapsed.
+6. Later reminders.
 
 When a row's next step names a slash command (a ‼ reason such as "run /my-review, then
 approve"), the row gets a button for it: `/my-review` starts a Claude session for that MR with
@@ -212,9 +211,15 @@ too high. `MRT_HIDE=lanes` hides the chips.
 - `ready · no reviewer · 3d` on Ready to share cards and `waiting · 4d` on Waiting for approval
   cards turn orange at two days. The clock starts at the clean agent review or the newest review
   request, so a fresh server shows real ages.
-- `Chromatic waiting · 21h` on MRs in `MRT_CHROMATIC_PROJECTS` whose head still has a pending
-  `MRT_CHROMATIC_STATUS` commit status (default `UI Tests`) half an hour after it was posted.
-  Orange after a day.
+- `Chromatic UI Tests · 21h` and `Chromatic UI Review · 21h` on MRs in `MRT_CHROMATIC_PROJECTS`
+  whose head pipeline is held only by a pending `MRT_CHROMATIC_STATUS` commit status (default
+  `UI Tests,UI Review`): every CI job has finished, so a person has to act in Chromatic. UI Tests
+  waits for someone to accept or deny the snapshot changes, UI Review for someone to approve the
+  review. Each chip links to its Chromatic page and turns orange after a day. The pipeline status
+  reads `waiting on Chromatic` instead of `running`, and the next step becomes yours, on your
+  own MRs and in the Your review tray alike (Drafts excepted): "in Chromatic, accept or deny the
+  snapshot changes (UI Tests)". This assumes the Chromatic CI job waits for its build (the
+  default; not `--exit-once-uploaded`).
 - `train drop · 2h` when the latest "removed this merge request from the merge train" note is newer
   than the latest add, and `flake · e2e` when every failed job on a red pipeline matches
   `MRT_FLAKY_JOBS`. Both make the card an agent turn.
@@ -547,7 +552,7 @@ The rest:
 | `MRT_LANE_PROJECTS` | — | Projects whose cards show a review-lane chip. |
 | `MRT_LANE_MAX_FILES`, `MRT_LANE_RISK_MAX`, `MRT_LANE_HUMAN_PATHS` | `7`, `45`, — | Auto-lane size, the risk score the bot approves at, and paths that always need a person (regex). |
 | `MRT_FLAKY_JOBS` | — | Regex of job names known to flake. |
-| `MRT_CHROMATIC_PROJECTS`, `MRT_CHROMATIC_STATUS` | —, `UI Tests` | Projects checked for a pending Chromatic commit status, and its name. |
+| `MRT_CHROMATIC_PROJECTS`, `MRT_CHROMATIC_STATUS` | —, `UI Tests,UI Review` | Projects checked for pending Chromatic commit statuses, and their names (comma-separated). |
 | `MRT_PROGRAM_FILE` | — | The plan file behind the Program tab and the strip's reminders. |
 | `MRT_AI_READY_LABEL`, `MRT_REPO_LABEL_PREFIX` | `ai-ready`, `repo:` | Labels a gap ticket needs before an agent can take it. |
 | `FOCUSED_EPIC_JQL_LABELS` | — | Labels whose tickets count as epic members alongside the epic's children. |

@@ -236,13 +236,13 @@ const LANE_HUMAN_RE = LANE_HUMAN_PATHS ? new RegExp(LANE_HUMAN_PATHS) : null;
 const FLAKY_JOBS = process.env.MRT_FLAKY_JOBS ?? '';
 const FLAKY_RE = FLAKY_JOBS ? new RegExp(FLAKY_JOBS) : null;
 
-// Chromatic's commit status; pending on the head sha means snapshots wait for acceptance.
+// Chromatic's commit statuses. Pending on the head sha after every CI job has finished means a
+// person has to act in Chromatic: accept the snapshots (UI Tests) or approve the review (UI Review).
 const CHROMATIC_PROJECTS = new Set(
   csv(process.env.MRT_CHROMATIC_PROJECTS ?? ''),
 );
-const CHROMATIC_STATUS = process.env.MRT_CHROMATIC_STATUS ?? 'UI Tests';
-// A build still capturing reads the same as one waiting for acceptance; give it this long.
-const CHROMATIC_GRACE_MS = 30 * 60 * 1000;
+const CHROMATIC_STATUSES = csv(process.env.MRT_CHROMATIC_STATUS ?? 'UI Tests,UI Review');
+const ACTIVE_STATUSES = new Set(['created', 'waiting_for_resource', 'preparing', 'pending', 'running']);
 
 // Second human (see README "Second human"): a review author's MR that you could otherwise approve
 // alone still needs another reviewer when it touches these paths. Globs in CODEOWNERS syntax, each
@@ -477,16 +477,28 @@ async function failedJobs(projectId, pipelineId) {
   };
 }
 
-/** Since when the head's Chromatic snapshots have waited for acceptance, or null. */
-async function chromaticWait(projectId, sha) {
-  if (!sha || !CHROMATIC_STATUS) return null;
+/**
+ * The Chromatic checks on the head that wait for a person, or null. `checks` lists each pending
+ * one (UI Tests, UI Review) with its link; `since` is the oldest.
+ */
+async function chromaticWait(projectId, sha, pipelineId) {
+  if (!sha || CHROMATIC_STATUSES.length === 0) return null;
   const statuses = await gl(`/projects/${projectId}/repository/commits/${sha}/statuses`, {
     per_page: 100,
   }).catch(() => []);
-  const s = statuses.find((x) => x.name === CHROMATIC_STATUS);
-  if (!s || !['pending', 'running'].includes(s.status)) return null;
-  if (Date.now() - new Date(s.created_at).getTime() < CHROMATIC_GRACE_MS) return null;
-  return { since: s.created_at, description: s.description ?? null, url: s.target_url ?? null };
+  const isChromatic = (s) => CHROMATIC_STATUSES.includes(s.name);
+  const waiting = statuses.filter((s) => isChromatic(s) && ACTIVE_STATUSES.has(s.status));
+  if (waiting.length === 0) return null;
+  // The chromatic job waits for its build, so while any CI job runs the build may still be capturing.
+  const ciActive = statuses.some(
+    (s) => !isChromatic(s) && ACTIVE_STATUSES.has(s.status) && (!pipelineId || s.pipeline_id === pipelineId),
+  );
+  if (ciActive) return null;
+  const checks = waiting
+    .map((s) => ({ name: s.name, description: s.description ?? null, url: s.target_url ?? null, since: s.created_at }))
+    .sort((a, b) => CHROMATIC_STATUSES.indexOf(a.name) - CHROMATIC_STATUSES.indexOf(b.name));
+  const since = checks.map((c) => c.since).sort()[0];
+  return { since, checks, url: checks[0].url, description: checks[0].description };
 }
 
 /**
@@ -696,7 +708,7 @@ export async function fetchOpenCards({ reviewTray = false } = {}) {
         pipeline.color === 'red' && detail.head_pipeline
           ? failedJobs(pid, detail.head_pipeline.id).catch(() => null)
           : null,
-        CHROMATIC_PROJECTS.has(base.project) ? chromaticWait(pid, detail.sha) : null,
+        CHROMATIC_PROJECTS.has(base.project) ? chromaticWait(pid, detail.sha, detail.head_pipeline?.id) : null,
       ]);
       return {
         ...base,
@@ -707,7 +719,8 @@ export async function fetchOpenCards({ reviewTray = false } = {}) {
         // Newest "requested review from" note: when the MR went to people.
         reviewRequestedAt: latestSystemNote(discussions, (n) => /^requested review from/i.test(n.body ?? '')),
         headSha: detail.sha ?? mr.sha ?? null,
-        pipeline,
+        // A pipeline held only by Chromatic says so instead of "running".
+        pipeline: chromatic && pipeline.color === 'running' ? { ...pipeline, status: 'waiting on Chromatic' } : pipeline,
         agentReview: parseAgentReview(discussions, detail.sha ?? mr.sha),
         unresolvedHumanThreads: countUnresolvedHumanThreads(discussions, mr.author?.username),
         reviewerCount: (detail.reviewers ?? []).filter((r) => !isBot(r.username ?? '')).length,

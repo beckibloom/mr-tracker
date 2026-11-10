@@ -3,6 +3,7 @@ import { useContext, useRef, useState } from 'react';
 import { BoardContext } from '../board-context.js';
 import { LINK_TYPES, cardSignals, followHeat, shortRef } from '../links.js';
 import { track } from '../track.js';
+import ChromaticChips from './ChromaticChips.jsx';
 import StateDot from './StateDot.jsx';
 
 const relTime = (iso) => {
@@ -85,19 +86,7 @@ const ageChip = (card) => {
   );
 };
 
-const chromaticChip = (card) =>
-  card.chromatic ? (
-    <a
-      className={`chip ${ageMs(card.chromatic.since) >= DAY_MS ? 'chip--warn' : 'chip--muted'}`}
-      href={card.chromatic.url ?? card.webUrl}
-      target="_blank"
-      rel="noreferrer"
-      title={`Chromatic snapshots wait for acceptance${card.chromatic.description ? `: ${card.chromatic.description}` : ''}`}
-      {...stopDrag}
-    >
-      Chromatic waiting · {relTime(card.chromatic.since)}
-    </a>
-  ) : null;
+const chromaticChip = (card) => <ChromaticChips card={card} linkProps={stopDrag} />;
 
 // CI noise an agent clears without asking: a merge-train drop, or only known-flaky jobs red.
 const ciNoiseChip = (card) => {

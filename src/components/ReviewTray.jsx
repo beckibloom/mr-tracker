@@ -4,6 +4,7 @@ import { BoardContext } from '../board-context.js';
 import { shortRef } from '../links.js';
 import { track } from '../track.js';
 
+import ChromaticChips from './ChromaticChips.jsx';
 import SkillButton, { skillIn } from './SkillButton.jsx';
 import StateDot from './StateDot.jsx';
 
@@ -158,6 +159,7 @@ const ReviewTray = ({ cards, showNotes, onLaunchSkill, defaultOpen = false }) =>
                     ) : (
                       <span className="review-pipeline">{card.pipeline.status}</span>
                     )}
+                    <ChromaticChips card={card} />
                     <span
                       className={`chip ${aiClean ? 'chip--good' : ai.reviewed ? 'chip--warn' : 'chip--muted'}`}
                       title={`Latest review comment by ${r.author} or a review bot`}
