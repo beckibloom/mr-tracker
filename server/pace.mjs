@@ -34,6 +34,8 @@ const TARGET_SET = Boolean(process.env.MRT_PACE_TARGET);
 const TARGET = Number(process.env.MRT_PACE_TARGET ?? 50);
 const DAILY_SET = Boolean(process.env.MRT_PACE_DAILY_TARGET);
 const LABEL = process.env.MRT_PACE_LABEL ?? 'files';
+// One or two plain sentences on what the count is for, shown in the "Left on main" hover card.
+const ABOUT = process.env.MRT_PACE_ABOUT ?? '';
 // The date to finish by; with it, the targets follow from what's left (see above).
 const GOAL_DATE = process.env.MRT_PACE_GOAL_DATE ?? '';
 const DAILY_TARGET = Number(process.env.MRT_PACE_DAILY_TARGET ?? 0) || Math.ceil(TARGET / 5);
@@ -336,9 +338,17 @@ async function compute() {
   return {
     enabled: true,
     label: LABEL,
+    about: ABOUT || null,
+    scope: SCOPE,
+    exclude: EXCLUDE,
+    split: SPLIT || null,
     splitLabel: SPLIT ? SPLIT_LABEL : null,
     repo: REPO,
     ref: REF,
+    workHours: [DAY_START, DAY_END],
+    leftAtDayStart,
+    workdaysFromToday,
+    weekWorkdays: weekWorkdays().length,
     target: weekTarget,
     targetSource: TARGET_SET || !derivedDaily ? 'set' : 'goal',
     goalDate: GOAL_DATE || null,

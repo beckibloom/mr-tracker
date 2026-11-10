@@ -182,6 +182,10 @@ TODAY 12 / 10 · THIS WEEK 102 / 50 · LEFT ON MAIN 777 · 4-WEEK AVERAGE 32/wk 
   left of today counts), as files a day; orange when the daily average is below it. "At this
   rate" is the date the mean of the last ten working days (today included) reaches zero.
 
+Hovering or focusing a tile opens a card that explains its number in plain words, with the
+live values filled in, for readers who don't know how the count works. The "Left on main" card
+also shows `MRT_PACE_ABOUT`, a sentence or two on what the count is for.
+
 The server fetches the ref and recounts every 15 minutes; **Recount** does it now. `GET /api/pace`
 returns the same numbers for scripts.
 
@@ -505,6 +509,7 @@ The rest:
 | `MRT_PACE_REF`, `MRT_PACE_EXCLUDE` | `origin/main`, — | Ref counted; comma-separated path prefixes skipped. |
 | `MRT_PACE_SPLIT`, `MRT_PACE_SPLIT_LABEL` | — | A path prefix counted and also shown on its own, and its label. |
 | `MRT_PACE_TARGET`, `MRT_PACE_GOAL_DATE`, `MRT_PACE_LABEL` | `50`, —, `files` | Weekly target, the date the plan promises, and the header's noun. |
+| `MRT_PACE_ABOUT` | — | What the count is for, shown in the "Left on main" hover card. Empty hides it. |
 | `MRT_PACE_HOLIDAYS` | — | Comma-separated `YYYY-MM-DD` days off: no daily target, and projections skip them. |
 | `MRT_PACE_DAILY_TARGET`, `MRT_PACE_WORK_HOURS` | weekly target ÷ 5, `9-17` | Files a working day, and the hours today's share is spread over. |
 | `MRT_LANE_PROJECTS` | — | Projects whose cards show a review-lane chip. |

@@ -2386,11 +2386,72 @@ a.review-note:hover {
 }
 
 .pace-tile {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
   min-width: 6.5rem;
+  cursor: help;
 }
+
+.pace-tile:focus-visible {
+  outline: 2px solid var(--gl-blue-500);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/* Hover card explaining a tile. The banner lets it overflow and stacks above the sections below. */
+.dash-banner {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
+.dash-banner .pace { border-radius: 7px; }
+
+.pace-tip {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: -0.75rem;
+  z-index: 10;
+  width: 21rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+  color: var(--text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  white-space: normal;
+  cursor: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease 0.15s, visibility 0s linear 0.27s;
+}
+
+/* Bridges the gap so the pointer can move onto the card without it closing. */
+.pace-tip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -0.5rem;
+  height: 0.5rem;
+}
+
+.pace-tip--end { left: auto; right: -0.75rem; }
+
+.pace-tile:hover > .pace-tip,
+.pace-tile:focus-visible > .pace-tip {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.15s, 0s;
+}
+
+.pace-tip p { margin: 0; }
+.pace-tip p + p { margin-top: 0.5rem; }
+.pace-tip code { font-size: 0.75rem; }
 
 .pace-label {
   font-size: 0.6875rem;
