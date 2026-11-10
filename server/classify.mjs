@@ -78,6 +78,7 @@ function agentWaitReason(card) {
  *
  *   you       merge failed · a review-tray MR needs you · re-approval needed · approved but not
  *             in the merge train · unresolved human threads on your own MR · Ready to share
+ *   author    someone else's review-tray MR that doesn't need you right now
  *   blocked   merge conflicts, or an open blocker (board link or GitLab dependency)
  *   ci        pipeline running, or in the merge train
  *   reviewer  Waiting for approval
@@ -107,6 +108,13 @@ export function whoseTurn(card, column = card.autoColumn) {
       return you(`our review asks for changes: send them to @${author}`);
     }
     return you(`review, then approve ${author}'s MR${also}`);
+  }
+  // Someone else's MR you reviewed or approved: its next step is the author's, not yours.
+  if (card.yourReview && !card.yourReview.byReviewAuthor) {
+    const author = `@${card.yourReview.author}`;
+    if (card.draft) return wait('author', `wait for ${author} to mark it ready`);
+    if (card.yourReview.approved) return wait('author', `approved: ${author} merges it`);
+    return wait('author', `wait for ${author}`);
   }
   if (card.hasConflicts || (card.openBlockers?.length ?? 0) > 0) {
     return wait('blocked', blockedReason(card));

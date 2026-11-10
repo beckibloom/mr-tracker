@@ -67,9 +67,18 @@ function me() {
   return currentUser;
 }
 
-/** Open MRs by a review author where you are assignee or reviewer, whatever MRT_MR_SCOPE says. */
-async function listReviewMergeRequests(params, username) {
+/**
+ * Open MRs for the Your review tray, whatever MRT_MR_SCOPE says: a review author's MRs where you
+ * are assignee or reviewer, plus (with `others`) anyone else's MR where you are a reviewer.
+ */
+async function listReviewMergeRequests(params, username, { others = false } = {}) {
   const seen = new Map();
+  if (others) {
+    const batch = await glAll('/merge_requests', { ...params, scope: 'all', reviewer_username: username });
+    for (const mr of batch) {
+      if (mr.author?.username !== username) seen.set(`${mr.project_id}!${mr.iid}`, mr);
+    }
+  }
   for (const author of REVIEW_AUTHORS) {
     for (const role of ['assignee_username', 'reviewer_username']) {
       const batch = await glAll('/merge_requests', {
@@ -502,6 +511,8 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
     since,
     noteVerdict: notePath ? noteVerdict(notePath) : null,
     author: mr.author?.username ?? '',
+    // A review author built it for you, so you also merge it; anyone else merges their own MR.
+    byReviewAuthor: REVIEW_AUTHORS.has(mr.author?.username),
     headSha: sha.slice(0, 8),
     approved: approvedOnHead,
     // You approved an earlier head, or a push reset your approval.
@@ -511,6 +522,15 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
     notePath,
     needsYou: !detail.draft && !mr.draft && !approvedOnHead,
   };
+}
+
+/** Whether an MR belongs in the Your review tray (see fetchOpenCards). */
+function forYourReview({ mr, detail, username, reviewTray }) {
+  const author = mr.author?.username;
+  if (author === username) return false;
+  const has = (users) => (users ?? []).some((u) => u.username === username);
+  if (REVIEW_AUTHORS.has(author)) return has(detail.assignees) || has(detail.reviewers);
+  return reviewTray && has(detail.reviewers);
 }
 
 /** Unresolved threads STARTED by a human reviewer (not a bot, not the MR author). */
@@ -642,13 +662,17 @@ function baseCard(mr, epicMembers) {
   };
 }
 
-export async function fetchOpenCards() {
+/**
+ * `reviewTray`: the Your review tray is on, so other people's MRs where you are a reviewer are
+ * fetched for it. Off, only a review author's MRs come in, and they show in the columns.
+ */
+export async function fetchOpenCards({ reviewTray = false } = {}) {
   // GitLab only recomputes has_conflicts when asked; without this it stays stale for days.
   const openParams = { state: 'opened', with_merge_status_recheck: true };
-  const username = REVIEW_AUTHORS.size > 0 ? (await me()).username : null;
+  const username = reviewTray || REVIEW_AUTHORS.size > 0 ? (await me()).username : null;
   const [mine, forReview, epicMembers] = await Promise.all([
     listMyMergeRequests(openParams),
-    username ? listReviewMergeRequests(openParams, username) : [],
+    username ? listReviewMergeRequests(openParams, username, { others: reviewTray }) : [],
     getEpicMembers(),
   ]);
   const open = new Map(mine.map((mr) => [`${mr.project_id}!${mr.iid}`, mr]));
@@ -709,11 +733,10 @@ export async function fetchOpenCards() {
             };
           }),
         inMergeTrain,
-        // Set only for a review author's MR where you are assignee or reviewer.
+        // Set for a review author's MR where you are assignee or reviewer, and (with the tray on)
+        // for anyone else's MR where you are a reviewer.
         yourReview:
-          username &&
-          REVIEW_AUTHORS.has(mr.author?.username) &&
-          [...(detail.assignees ?? []), ...(detail.reviewers ?? [])].some((u) => u.username === username)
+          username && forYourReview({ mr, detail, username, reviewTray })
             ? yourReviewState({ mr, detail, approvals, discussions, username, reviewNotes })
             : null,
       };

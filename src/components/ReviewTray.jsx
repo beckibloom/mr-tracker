@@ -47,7 +47,7 @@ const secondHumanTitle = ({ reasons }) =>
 
 const VERDICT_TEXT = { approve: 'our review: approve', 'request-changes': 'our review: changes' };
 
-/** MRs a review author built for you to approve; a red dot while any is ready and unapproved. */
+/** MRs you review (yours to approve); a red dot while any is ready and unapproved. */
 const ReviewTray = ({ cards, showNotes, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   const { searchSet } = useContext(BoardContext);

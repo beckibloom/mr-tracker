@@ -24,7 +24,6 @@ import {
   fetchOpenCards,
   getMergeRequest,
   LANE_RISK_MAX,
-  REVIEW_AUTHORS,
 } from './gitlab.mjs';
 import { addWorklog, getLoggedTime, hasJiraWrite } from './jira.mjs';
 import { buildPrompt, loadActions, loadCheatsheet } from './launcher.mjs';
@@ -42,9 +41,9 @@ const HIDDEN = (process.env.MRT_HIDE ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
-// The Your review tray: on when MRT_REVIEW_AUTHORS names someone. Hiding it puts those MRs back
-// in the columns.
-const REVIEW_TRAY = REVIEW_AUTHORS.size > 0 && !HIDDEN.includes('review');
+// The Your review tray: MRs where you are a reviewer, plus a review author's MRs assigned to you.
+// Hiding it puts the review author's MRs back in the columns and drops everyone else's.
+const REVIEW_TRAY = !HIDDEN.includes('review');
 import { loadState, saveState } from './store.mjs';
 import { buildTimeReport } from './time-signals.mjs';
 
@@ -86,7 +85,7 @@ async function sync() {
   syncing = true;
   try {
     assertToken();
-    const [open, merged] = await Promise.all([fetchOpenCards(), fetchMergedCards()]);
+    const [open, merged] = await Promise.all([fetchOpenCards({ reviewTray: REVIEW_TRAY }), fetchMergedCards()]);
     const cards = {};
     for (const card of [...open, ...merged]) cards[card.key] = card;
     resolveMentions(cards);

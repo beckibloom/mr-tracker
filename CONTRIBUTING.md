@@ -84,7 +84,7 @@ These are the lines I won't move in this copy; a fork is the place to cross them
 | `src/components/ChainsPanel.jsx` | The Chains tab                                                                                 |
 | `src/components/YourMoveStrip.jsx` | The Your move strip above the columns                                                        |
 | `src/fold.js`                    | Pure helpers: folding blocked cards under their blocker, unblock counts for the sort           |
-| `src/components/ReviewTray.jsx`  | The Your review tray: review-author MRs you approve, red dot while any needs you               |
+| `src/components/ReviewTray.jsx`  | The Your review tray: MRs you review, red dot while any needs you                             |
 | `src/components/SessionsPanel.jsx`| The Sessions tab                                                                               |
 | `src/links.js`                   | Pure helpers: link index, chains, "your turn" signals, chain layering, project abbreviations   |
 | `src/styles.css`                 | All styles; theme tokens at the top                                                            |

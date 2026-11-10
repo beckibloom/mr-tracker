@@ -23,6 +23,8 @@ import { track } from './track.js';
 const UI_REFRESH_MS = 60 * 1000;
 // A quick action with this id also shows on the Ready to share header and in the Your move strip.
 const REQUEST_REVIEWS_ID = 'request-reviews';
+// The quick action behind Your move's "Get more" button: names the next things to do.
+const GET_MORE_ID = 'unblock-me';
 
 const App = () => {
   const [board, setBoard] = useState(null);
@@ -380,6 +382,17 @@ const App = () => {
       {requestAction.prompt}
     </button>
   ) : null;
+  const getMoreAction = launcherActions.find((a) => a.id === GET_MORE_ID);
+  const getMore = getMoreAction ? (
+    <button
+      type="button"
+      className="btn btn--small yourmove-more"
+      title={`What to do next. Starts a Claude session: ${getMoreAction.prompt}`}
+      onClick={() => launchAction(getMoreAction.id, '')}
+    >
+      Get more
+    </button>
+  ) : null;
   // Ready MRs that still need you first; among them, ones our review already cleared, then the
   // one waiting longest; Drafts last.
   const forReview = board.cards
@@ -522,6 +535,7 @@ const App = () => {
                 cards={cards}
                 onReveal={reveal}
                 requestReviews={requestReviews}
+                getMore={getMore}
                 reminders={board.reminders ?? []}
                 onHandoff={setHandoff}
                 onLaunchSkill={(key, prompt) => {

@@ -1721,6 +1721,22 @@ button.card-note-text {
   font-size: 0.8125rem;
 }
 
+.yourmove-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dash-section .yourmove-head {
+  align-self: stretch;
+}
+
+.yourmove-more {
+  flex: none;
+}
+
 .yourmove-label {
   flex: none;
   padding-top: 0.125rem;

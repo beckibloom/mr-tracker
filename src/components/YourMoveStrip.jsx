@@ -5,7 +5,7 @@ import { shortRef } from '../links.js';
 const READY = 'request review';
 
 // Short labels for whose move a card waits on (server/classify.mjs whoseTurn).
-const TURN_TEXT = { agent: 'agent', reviewer: 'reviewer', ci: 'CI', blocked: 'blocked' };
+const TURN_TEXT = { agent: 'agent', reviewer: 'reviewer', ci: 'CI', blocked: 'blocked', author: 'author' };
 
 const ageText = (iso) => {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -115,6 +115,7 @@ const YourMoveStrip = ({
   cards,
   onReveal,
   requestReviews,
+  getMore,
   onHandoff,
   onLaunchSkill,
   reminders = [],
@@ -268,9 +269,12 @@ const YourMoveStrip = ({
 
   return (
     <section className={`yourmove${section ? ' yourmove--section' : ''}`} aria-label="Your move">
-      <span className="yourmove-label">
-        Your move{mine.length > 0 && <span className="view-count">{mine.length}</span>}
-      </span>
+      <div className="yourmove-head">
+        <span className="yourmove-label">
+          Your move{mine.length > 0 && <span className="view-count">{mine.length}</span>}
+        </span>
+        {getMore}
+      </div>
       {all.length === 0 ? (
         <p className="yourmove-empty">Nothing waiting on you</p>
       ) : (

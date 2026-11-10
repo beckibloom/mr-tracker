@@ -33,9 +33,10 @@ things follow from that, and both matter if your setup differs:
   asked for them, so set `MRT_MR_SCOPE=assigned_to_me` (or `both`) to see them. An agent
   MR with no assignee is invisible to the board either way; add yourself as assignee in
   GitLab and it shows up on the next sync.
-- **MRs an agent builds for you to approve.** If an agent account opens MRs that you approve
-  yourself, name it in `MRT_REVIEW_AUTHORS`. Its MRs where you are assignee or reviewer leave
-  the columns for the **Your review** tray. See "Your review tray" below.
+- **MRs you review.** Anyone else's MR where you are a reviewer sits in the **Your review**
+  tray. If an agent account opens MRs that you approve yourself, name it in
+  `MRT_REVIEW_AUTHORS`: its MRs where you are assignee or reviewer leave the columns for the
+  same tray. See "Your review tray" below.
 - **Where the Time tab looks.** It reads Claude Code session logs and git history on this
   machine to propose Jira worklogs. If your agents run remotely, the board still works
   (it only talks to GitLab), but the Time tab will see nothing. That could be adapted to
@@ -84,6 +85,7 @@ Every open card carries a turn, worked out on the server (`whoseTurn` in
 | `blocked`  | Merge conflicts, or an open blocker                                                                    |
 | `ci`       | Pipeline running, or in the merge train                                                                |
 | `reviewer` | Waiting for approval                                                                                   |
+| `author`   | Someone else's Your review MR that doesn't need you: a Draft, or one you approved on its head          |
 | `agent`    | Agent iteration, Draft, anything else. Two agent turns carry a reason, because an agent can clear them without asking: a red pipeline whose only failures are known flakes (`MRT_FLAKY_JOBS`), and an approved MR the merge train dropped |
 
 Every other turn also carries the next step as an instruction, so a card waiting on someone
@@ -390,7 +392,9 @@ replaced with what you typed or picked:
 falling back to `MRT_LAUNCHER_CWD`, then your home directory.
 
 An action with id `request-reviews` also appears as a button under the Ready to share header and
-on the Your move strip's ready-to-share row, labelled with its prompt.
+on the Your move strip's ready-to-share row, labelled with its prompt. An action with id
+`unblock-me` becomes the **Get more** button at the top right of Your move: point its prompt at
+whatever names your next things to do beyond what the strip lists.
 
 Sessions use the model, permission mode and effort from your `~/.claude/settings.json`;
 `MRT_CLAUDE_ARGS` adds flags on top (for example `--model fable --permission-mode auto`).
@@ -420,11 +424,16 @@ Reading and writing worklogs need `JIRA_EMAIL` + `JIRA_API_TOKEN`.
 
 ## Your review tray
 
-Some agents build MRs that you then approve yourself, so your approval is the only review they
-get. List those authors in `MRT_REVIEW_AUTHORS` (comma-separated; empty by default, which turns
-the tray off). Every open MR they authored where you are the assignee or a reviewer sits in the
-**Your review** tray under the board instead of a column, so nothing shows twice. Your own MRs
-are unaffected, and the tray finds reviewer-only MRs whatever `MRT_MR_SCOPE` says.
+The **Your review** tray under the board holds every open MR you review, so nothing shows twice:
+
+- **Anyone else's MR where you are a reviewer.** Add yourself as reviewer in GitLab and it
+  appears on the next sync. Once you approve its head, the next step is the author's, so it
+  leaves Your move until they push again.
+- **A review author's MR where you are the assignee or a reviewer.** Some agents build MRs that
+  you then approve and merge yourself, so your approval is the only review they get. List those
+  authors in `MRT_REVIEW_AUTHORS` (comma-separated; empty by default).
+
+Your own MRs are unaffected, and the tray finds these MRs whatever `MRT_MR_SCOPE` says.
 
 Each row shows the pipeline dot, the ref and title (both link to the MR), Draft or ready, how
 long it has waited on you (since its newest push or un-drafting), its file count, the
@@ -439,8 +448,8 @@ ready MRs your review already cleared sort first.
 An MR needs you when it is ready (not Draft) and you haven't approved its current head. A push
 after your approval counts as unapproved even when GitLab keeps the approval, and the row then
 shows `re-approve`. While any MR needs you, a red dot sits on the tray's toggle, open or
-collapsed; at zero there is no dot. `MRT_HIDE=review` hides the tray and puts those MRs back in
-the columns.
+collapsed; at zero there is no dot. `MRT_HIDE=review` hides the tray, puts a review author's
+MRs back in the columns and drops everyone else's.
 
 ### Second human
 
@@ -517,7 +526,7 @@ The rest:
 | `MRT_CHEATSHEET_FILE` | — | A text or Markdown file shown, collapsed, under the quick actions (a personal cheat sheet, notes on background jobs). |
 | `MRT_OPEN_IN` | `terminal` | `vscode` opens sessions in a Claude Code tab in VS Code. New sessions (card prompts, quick actions) open a tab with the prompt filled in; press Enter to start, and the tracker links the session to its card once it appears. A background job that is still running opens in Terminal, since only a terminal can attach to it. |
 | `MRT_LINK_BROWSER` | — | A macOS app name, e.g. `"Google Chrome"`. Links on the board (MRs, Jira, pipelines) open in that app, which helps when the board runs inside VS Code's browser. |
-| `MRT_REVIEW_AUTHORS` | — | Comma-separated authors (usually an agent account) whose MRs you approve yourself; their MRs assigned to you or awaiting your review go to the Your review tray. Empty turns the tray off. |
+| `MRT_REVIEW_AUTHORS` | — | Comma-separated authors (usually an agent account) whose MRs you approve and merge yourself; their MRs assigned to you or awaiting your review go to the Your review tray. Other people's MRs where you are a reviewer go there either way. |
 | `MRT_REVIEW_NOTES_DIR` | — | Where you save your own reviews as `mr-review-<iid>-<sha8>.md`, at any depth. Set it to show the "our review" chip in the Your review tray. |
 | `MRT_SECOND_REVIEW_PATHS` | — | Globs (CODEOWNERS syntax, optional `group/project:` scope) that put a `second human` chip on a review author's MR. |
 | `MRT_SECOND_REVIEW_CODEOWNERS` | — | `group/project:Section` pairs: that project's CODEOWNERS section adds its paths. |
