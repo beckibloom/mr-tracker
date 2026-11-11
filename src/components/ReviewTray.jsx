@@ -105,8 +105,9 @@ const ReviewTray = ({ cards, showNotes, onLaunchSkill, defaultOpen = false }) =>
               return (
                 <li
                   key={card.key}
+                  data-card-key={card.key}
                   className={`review-item${r.needsYou ? ' review-item--needs' : ''}${
-                    searchSet && !searchSet.has(card.key) ? ' review-item--dim' : ''
+                    searchSet ? (searchSet.has(card.key) ? ' review-item--search-hit' : ' review-item--dim') : ''
                   }`}
                 >
                   <StateDot card={card} />

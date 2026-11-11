@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
+import { BoardContext } from '../board-context.js';
 import { shortRef } from '../links.js';
 
 import SkillButton, { skillIn } from './SkillButton.jsx';
@@ -19,11 +20,35 @@ const ageText = (iso) => {
 const dueText = (n) =>
   n == null ? '' : n > 1 ? `in ${n} days` : n === 1 ? 'tomorrow' : n === 0 ? 'today' : `${-n} day${n === -1 ? '' : 's'} late`;
 
-const ReminderRow = ({ reminder, next = false }) => (
+// While the top-bar search has a query, matching MR rows glow and every other row dims.
+const searchClass = (searchSet, key) =>
+  searchSet ? (key && searchSet.has(key) ? ' yourmove-row--search-hit' : ' yourmove-row--dim') : '';
+
+/**
+ * The MRs the strip lists, in display order: yours (‼ first, then the one waiting longest),
+ * ‼ MRs waiting on someone else, then the ones parked with an agent.
+ */
+export const yourMoveGroups = (cards) => ({
+  mine: cards
+    .filter((c) => c.turn === 'you')
+    .sort(
+      (a, b) =>
+        (b.important ? 1 : 0) - (a.important ? 1 : 0) || new Date(a.updatedAt) - new Date(b.updatedAt),
+    ),
+  watched: cards.filter((c) => c.important && c.turn && c.turn !== 'you' && !c.handoff),
+  parked: cards.filter((c) => c.handoff),
+});
+
+export const yourMoveKeys = (cards) => {
+  const { mine, watched, parked } = yourMoveGroups(cards);
+  return [...mine, ...watched, ...parked].map((c) => c.key);
+};
+
+const ReminderRow = ({ reminder, next = false, searchSet = null }) => (
   <li
     className={`yourmove-row yourmove-row--reminder${next ? ' yourmove-row--next' : ''}${
       reminder.daysLeft != null && reminder.daysLeft <= 2 ? ' yourmove-row--due' : ''
-    }`}
+    }${searchClass(searchSet, null)}`}
   >
     <span className="yourmove-ref yourmove-due" title={reminder.due ?? undefined}>
       {next ? 'Next' : reminder.due ? reminder.due.slice(5).replace('-', '/') : '•'}
@@ -44,8 +69,13 @@ const ReminderRow = ({ reminder, next = false }) => (
   </li>
 );
 
-const Row = ({ card, onReveal, extra, reason, onLaunchSkill }) => (
-  <li className={`yourmove-row${card.important ? ' yourmove-row--important' : ''}${reason ? ' yourmove-row--watch' : ''}`}>
+const Row = ({ card, onReveal, extra, reason, onLaunchSkill, searchSet = null }) => (
+  <li
+    data-card-key={card.key}
+    className={`yourmove-row${card.important ? ' yourmove-row--important' : ''}${
+      reason ? ' yourmove-row--watch' : ''
+    }${searchClass(searchSet, card.key)}`}
+  >
     {card.column === 'review' ? (
       <span className="copy-ref yourmove-ref" title="In the Your review tray">
         {shortRef(card)}
@@ -107,14 +137,15 @@ const YourMoveStrip = ({
 }) => {
   const [readyOpen, setReadyOpen] = useState(false);
   const [parkedOpen, setParkedOpen] = useState(false);
-  const mine = cards
-    .filter((c) => c.turn === 'you')
-    .sort(
-      (a, b) =>
-        (b.important ? 1 : 0) - (a.important ? 1 : 0) || new Date(a.updatedAt) - new Date(b.updatedAt),
-    );
+  const { searchSet } = useContext(BoardContext);
+  const { mine, watched: watchedCards, parked } = yourMoveGroups(cards);
   const ready = mine.filter((c) => c.turnReason === READY);
   const collapseReady = ready.length > 1;
+  // A search hit inside a collapsed group opens it, as the Your review tray does.
+  const readyHit = ready.some((c) => searchSet?.has(c.key));
+  const readyShown = readyOpen || readyHit;
+  const parkedHit = parked.some((c) => searchSet?.has(c.key));
+  const parkedShown = parkedOpen || parkedHit;
   const oldestReady = ready
     .map((c) => c.columnSince)
     .filter(Boolean)
@@ -125,21 +156,24 @@ const YourMoveStrip = ({
     if (collapseReady && card.turnReason === READY) {
       if (card !== ready[0]) continue;
       rows.push(
-        <li key="ready" className="yourmove-row yourmove-row--ready">
+        <li
+          key="ready"
+          className={`yourmove-row yourmove-row--ready${searchSet && !readyHit ? ' yourmove-row--dim' : ''}`}
+        >
           <button
             type="button"
             className="yourmove-ready-toggle"
-            aria-expanded={readyOpen}
+            aria-expanded={readyShown}
             onClick={() => setReadyOpen((o) => !o)}
           >
             {ready.length} ready to share with no reviewer{oldestReady && `, oldest ${ageText(oldestReady)}`}{' '}
-            {readyOpen ? '▾' : '▸'}
+            {readyShown ? '▾' : '▸'}
           </button>
           {requestReviews && <span className="yourmove-reason">→</span>}
           {requestReviews}
         </li>,
       );
-      if (readyOpen) {
+      if (readyShown) {
         for (const r of ready) {
           rows.push(
             <Row
@@ -147,6 +181,7 @@ const YourMoveStrip = ({
               card={r}
               onReveal={onReveal}
               onLaunchSkill={onLaunchSkill}
+              searchSet={searchSet}
               extra={<HandoffButton card={r} onHandoff={onHandoff} />}
             />,
           );
@@ -160,6 +195,7 @@ const YourMoveStrip = ({
         card={card}
         onReveal={onReveal}
         onLaunchSkill={onLaunchSkill}
+        searchSet={searchSet}
         extra={
           <>
             {card.turnReason === READY && requestReviews}
@@ -171,39 +207,40 @@ const YourMoveStrip = ({
   }
 
   // ‼ MRs whose move is someone else's still show, with the flag's next step and who holds it.
-  const watched = cards
-    .filter((c) => c.important && c.turn && c.turn !== 'you' && !c.handoff)
-    .map((c) => {
-      const who = TURN_TEXT[c.turn] ?? c.turn;
-      const what = c.importantInfo?.reason ?? c.waitReason;
-      return (
-        <Row
-          key={c.key}
-          card={c}
-          onReveal={onReveal}
-          onLaunchSkill={onLaunchSkill}
-          reason={`${who}${what ? `: ${what}` : ''}`}
-        />
-      );
-    });
+  const watched = watchedCards.map((c) => {
+    const who = TURN_TEXT[c.turn] ?? c.turn;
+    const what = c.importantInfo?.reason ?? c.waitReason;
+    return (
+      <Row
+        key={c.key}
+        card={c}
+        onReveal={onReveal}
+        onLaunchSkill={onLaunchSkill}
+        searchSet={searchSet}
+        reason={`${who}${what ? `: ${what}` : ''}`}
+      />
+    );
+  });
 
   // Moves an agent holds, out of the way in one collapsed row; each comes back on its own.
-  const parked = cards.filter((c) => c.handoff);
   const parkedRows = [];
   if (parked.length > 0) {
     parkedRows.push(
-      <li key="parked" className="yourmove-row yourmove-row--parked">
+      <li
+        key="parked"
+        className={`yourmove-row yourmove-row--parked${searchSet && !parkedHit ? ' yourmove-row--dim' : ''}`}
+      >
         <button
           type="button"
           className="yourmove-ready-toggle"
-          aria-expanded={parkedOpen}
+          aria-expanded={parkedShown}
           onClick={() => setParkedOpen((o) => !o)}
         >
-          {parked.length} with an agent {parkedOpen ? '▾' : '▸'}
+          {parked.length} with an agent {parkedShown ? '▾' : '▸'}
         </button>
       </li>,
     );
-    if (parkedOpen) {
+    if (parkedShown) {
       for (const c of parked) {
         const h = c.handoff;
         const since = h.session ? 'Claude session working' : `handed off ${ageText(h.at)} ago`;
@@ -212,6 +249,7 @@ const YourMoveStrip = ({
             key={`parked:${c.key}`}
             card={c}
             onReveal={onReveal}
+            searchSet={searchSet}
             reason={`${since} · then ${h.then}`}
             extra={
               !h.session && onHandoff ? (
@@ -235,12 +273,12 @@ const YourMoveStrip = ({
   const soon = otherReminders.filter((r) => r.daysLeft != null && r.daysLeft <= 2);
   const later = otherReminders.filter((r) => !soon.includes(r));
   const all = [
-    ...(nextStep ? [<ReminderRow key="next" reminder={nextStep} next />] : []),
-    ...soon.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} />),
+    ...(nextStep ? [<ReminderRow key="next" reminder={nextStep} next searchSet={searchSet} />] : []),
+    ...soon.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} searchSet={searchSet} />),
     ...rows,
     ...watched,
     ...parkedRows,
-    ...later.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} />),
+    ...later.map((r) => <ReminderRow key={`reminder:${r.text}`} reminder={r} searchSet={searchSet} />),
   ];
 
   return (

@@ -5,15 +5,20 @@ const scrollToCard = (key) =>
     .querySelector(`[data-card-key="${CSS.escape(key)}"]`)
     ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
-// Find an MR on the board: "/" focuses, Enter jumps to the next match, Escape clears.
-const SearchBox = ({ query, onChange, hits }) => {
+/**
+ * Find an MR on the current tab: "/" focuses, Enter jumps to the next match, Escape clears.
+ * `elsewhere` names matches this tab doesn't show, with a button to the tab that does.
+ */
+const SearchBox = ({ query, onChange, hits, elsewhere = null }) => {
   const inputRef = useRef(null);
   const [index, setIndex] = useState(0);
+  // Board polls rebuild the hit list; only a different set of matches restarts at the first one.
+  const hitsSig = hits ? hits.join('\n') : null;
 
   useEffect(() => {
     setIndex(0);
     if (hits?.length) scrollToCard(hits[0]);
-  }, [hits]);
+  }, [hitsSig]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -55,6 +60,16 @@ const SearchBox = ({ query, onChange, hits }) => {
         }}
       />
       {status && <span className="search-status">{status}</span>}
+      {hits && elsewhere?.count > 0 && (
+        <button
+          type="button"
+          className="btn btn--small search-elsewhere"
+          onClick={elsewhere.onShow}
+          title={`Show the ${elsewhere.count === 1 ? 'match' : 'matches'} on the ${elsewhere.label} tab`}
+        >
+          {hits.length > 0 ? `${elsewhere.count} more on ${elsewhere.label}` : `${elsewhere.count} on ${elsewhere.label}`} ▸
+        </button>
+      )}
     </label>
   );
 };

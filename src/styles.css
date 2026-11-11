@@ -2055,6 +2055,26 @@ button.card-note-text {
   opacity: 0.3;
 }
 
+/* Dashboard search: matching Your move and Your review rows glow, the other rows dim */
+.yourmove-row--search-hit,
+.review-item--search-hit {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--claude) 14%, transparent);
+  box-shadow: 0 0 0 2px var(--claude);
+}
+
+.review-item--search-hit + .review-item {
+  border-top-color: transparent;
+}
+
+.yourmove-row--dim {
+  opacity: 0.3;
+}
+
+.search-elsewhere {
+  white-space: nowrap;
+}
+
 .review-ref {
   text-decoration: none;
   cursor: pointer;

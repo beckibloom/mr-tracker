@@ -12,7 +12,7 @@ import SessionsPanel from './components/SessionsPanel.jsx';
 import StagedTray from './components/StagedTray.jsx';
 import TimePanel from './components/TimePanel.jsx';
 import TodoTray from './components/TodoTray.jsx';
-import YourMoveStrip from './components/YourMoveStrip.jsx';
+import YourMoveStrip, { yourMoveKeys } from './components/YourMoveStrip.jsx';
 import SearchBox from './components/SearchBox.jsx';
 import { buildFolds, foldIdOf, unblockCounts } from './fold.js';
 import { buildChains, buildLinkIndex, setProjectAbbr, shortRef } from './links.js';
@@ -405,6 +405,12 @@ const App = () => {
         sortCards(a, b),
     );
   const merged = board.cards.filter((c) => c.column === 'merged').sort(sortCards);
+  // The dashboard search walks Your move, then Your review; an MR in both counts once.
+  const dashboardKeys = [
+    ...(hidden.has('yourmove') ? [] : yourMoveKeys(cards)),
+    ...(board.reviewTray && !hidden.has('review') ? forReview.map((c) => c.key) : []),
+  ];
+  const dashboardHits = searchSet && [...new Set(dashboardKeys)].filter((k) => searchSet.has(k));
   const yourMoveCount = cards.filter((c) => c.turn === 'you').length;
 
   return (
@@ -488,6 +494,20 @@ const App = () => {
             </button>
           </div>
         </div>
+        {view === 'dashboard' && !hidden.has('search') && (
+          <div className="topbar-tools">
+            <SearchBox
+              query={query}
+              onChange={searchFor}
+              hits={dashboardHits}
+              elsewhere={{
+                count: (searchHits?.length ?? 0) - (dashboardHits?.length ?? 0),
+                label: 'MRs',
+                onShow: () => showView('board'),
+              }}
+            />
+          </div>
+        )}
         {view === 'board' && ['search', 'sort', 'yourmove'].some((f) => !hidden.has(f)) && (
           <div className="topbar-tools">
             {!hidden.has('search') && <SearchBox query={query} onChange={searchFor} hits={searchHits} />}
