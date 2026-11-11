@@ -60,12 +60,14 @@ const Row = ({ card, onReveal, extra, reason, onLaunchSkill }) => (
         {shortRef(card)}
       </button>
     )}
-    <a className="yourmove-title" href={card.webUrl} target="_blank" rel="noreferrer" title={card.title}>
-      {card.important && '‼ '}
-      {card.title.replace(/^Draft:\s*/, '')}
-    </a>
-    <span className="yourmove-reason" title={card.importantInfo?.reason ?? undefined}>
-      {reason ?? card.turnReason}
+    <span className="yourmove-main">
+      <a className="yourmove-title" href={card.webUrl} target="_blank" rel="noreferrer" title={card.title}>
+        {card.important && '‼ '}
+        {card.title.replace(/^Draft:\s*/, '')}
+      </a>
+      <span className="yourmove-reason" title={card.importantInfo?.reason ?? undefined}>
+        {reason ?? card.turnReason}
+      </span>
     </span>
     <SkillButton
       card={card}

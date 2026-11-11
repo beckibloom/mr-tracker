@@ -1803,6 +1803,21 @@ button.card-note-text {
   white-space: nowrap;
 }
 
+/* An MR row stacks its reason under the title, so a long reason wraps instead of hiding the title. */
+.yourmove-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.yourmove-main .yourmove-title { max-width: 100%; }
+
+.yourmove-main .yourmove-reason {
+  font-size: 0.8125rem;
+  white-space: normal;
+}
+
 .yourmove-ready-toggle {
   padding: 0;
   background: none;
