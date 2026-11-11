@@ -271,10 +271,39 @@ that MR merges; one with `done: true` is hidden. `GET /api/program` returns the 
 }
 ```
 
-A card joins the first family (in file order) whose `mrs`, `tickets` or `match` (a
-case-insensitive regex over title and branch) it hits. With a focused epic, only the epic's cards
+A card joins the family whose `mrs` or `tickets` list it; failing that, the first family (in
+order) whose `match` (a case-insensitive regex over title and branch) hits. With a focused epic, only the epic's cards
 join; `projects` limits them to the migrated repos. `MRT_HIDE=program` hides the tab and the
 reminders.
+
+### Jira as the source of truth
+
+Add `jira` to the file and the tab reads families and gaps from Jira instead of the file:
+
+```json
+{
+  "jira": { "families": "^(\\[[A-Z]+\\]\\s*)?(Wave( umbrella)?|Stretch):", "blockLink": "Blocks" },
+  "families": [
+    { "jira": "WEB-200", "packages": ["legacy-ui-modal"], "match": "\\bmodal\\b", "forecast": "2027-01-15" },
+    { "id": "config-only", "name": "Config only", "packages": ["legacy-ui-tokens"], "done": true }
+  ],
+  "gaps": [{ "key": "WEB-31", "files": 12, "note": "dismiss API" }]
+}
+```
+
+- **Families** are the focused epic's open tickets whose summary matches `jira.families`, plus
+  every ticket a family entry names in `jira` (any status, any parent). Each row takes its
+  status, owner (assignee), forecast (due date), areas (sub-tasks) and gate from Jira, and links
+  the ticket.
+- **Gaps** are the open tickets linked as blocking (`blockLink`, default `Blocks`) a family
+  ticket or a ticket in its `tickets`. A gap that blocks two families names both.
+- **The file adds only what Jira doesn't hold:** a family entry's `packages`, `match`, `mrs`,
+  extra `tickets`, `name`, `note` and `withLane`, and a `forecast` used until the ticket has a due
+  date (shown in italics). A `gaps` entry adds `files` and `note` to a gap Jira found. Entries
+  without `jira` stay as file-only rows.
+
+Jira results are cached for five minutes. If Jira fails, the tab shows the file's rows with no
+gaps and says so.
 
 ## Staged tray
 

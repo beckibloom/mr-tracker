@@ -2375,6 +2375,9 @@ a.review-note:hover {
 .program-note { font-size: 0.75rem; color: var(--text-muted); max-width: 28rem; }
 .program-split, .program-none, .program-lane-date { color: var(--text-muted); }
 .program-family { font-weight: 600; }
+.program-jira { font-size: 0.75rem; white-space: nowrap; }
+.program-status { color: var(--text-muted); }
+.program-forecast--file { color: var(--text-muted); font-style: italic; }
 .program-flag { margin-left: 0.375rem; }
 
 .program-mrs {

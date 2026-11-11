@@ -2,14 +2,24 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { getIssues, hasJiraWrite, jiraMyself, jiraUrl, keysInOpenSprint } from './jira.mjs';
+import {
+  epicMembersJql,
+  getIssues,
+  hasJiraWrite,
+  jiraMyself,
+  jiraUrl,
+  keysInOpenSprint,
+  searchIssues,
+} from './jira.mjs';
 import { countFor, filesWeeksAgo, headFiles, removedBetween } from './pace.mjs';
 
 /*
- * The program view (the tab named after FOCUSED_EPIC_LABEL): one row per family of the migration
- * from a plan file you keep by hand, with live file counts from the pace census and the MRs on
- * the board that belong to each family. The same file lists the gap tickets that gate families
- * and dated reminders that show in the Your move strip. Shape: README "Program tab".
+ * The program view (the tab named after FOCUSED_EPIC_LABEL): one row per family of the migration,
+ * with live file counts from the pace census and the MRs on the board that belong to each family.
+ * With `jira` in the plan file, Jira is the source of truth: families are the epic's tickets the
+ * file lists or whose summary matches `jira.families`, and gaps are the open tickets that block
+ * them. The file then only adds what Jira doesn't hold (packages, MR matching, notes). Without
+ * `jira`, the file lists families and gaps itself. Shape: README "Program tab".
  */
 const RAW = process.env.MRT_PROGRAM_FILE ?? '';
 export const PROGRAM_FILE = RAW.startsWith('~/') ? join(homedir(), RAW.slice(2)) : RAW;
@@ -49,15 +59,132 @@ const regexOf = (src) => {
   }
 };
 
-/** The first family (in file order) a card belongs to: listed MR, Jira key, or title/branch match. */
+/**
+ * The family a card belongs to: a listed MR or Jira key in any family first, then the first
+ * family (in order) whose `match` hits the title or branch.
+ */
 export function familyOf(card, families) {
   for (const f of families) {
     if ((f.mrs ?? []).includes(card.key)) return f.id;
     if ((f.tickets ?? []).some((t) => card.jiraKeys?.includes(t))) return f.id;
+  }
+  for (const f of families) {
     const re = regexOf(f.match);
     if (re && (re.test(card.title) || re.test(card.branch ?? ''))) return f.id;
   }
   return null;
+}
+
+const FAMILY_TTL_MS = 5 * 60 * 1000;
+const FAMILY_FIELDS = ['summary', 'status', 'assignee', 'issuetype', 'issuelinks', 'duedate', 'subtasks'];
+let familyCache = null; // { key, at, promise }
+
+const isDone = (issue) => issue?.fields?.status?.statusCategory?.key === 'done';
+
+/** "[UI] Wave umbrella: modal → new modal (165 files)" → "modal". */
+export function familyName(summary = '') {
+  const rest = summary.replace(/^(\[[^\]]+\]\s*)?((wave umbrella|wave|stretch)\s*:\s*)?/i, '');
+  return rest.split(/\s+(?:→|—|-|\()\s*/)[0].trim() || summary;
+}
+
+/** The epic's open tickets plus every ticket the file lists, cached for five minutes. */
+function familyIssues(listed) {
+  const base = epicMembersJql();
+  const parts = [base && `((${base}) AND statusCategory != Done)`, listed.length && `key in (${listed.join(',')})`];
+  const jql = parts.filter(Boolean).join(' OR ');
+  if (!familyCache || familyCache.key !== jql || Date.now() - familyCache.at > FAMILY_TTL_MS) {
+    const promise = searchIssues(jql, FAMILY_FIELDS);
+    familyCache = { key: jql, at: Date.now(), promise };
+    promise.catch(() => {
+      if (familyCache?.promise === promise) familyCache = null;
+    });
+  }
+  return familyCache.promise;
+}
+
+/**
+ * Families and gaps from Jira. A family is a ticket the file lists (`jira` on a family entry) or
+ * an epic ticket whose summary matches `jira.families`; its open "is blocked by" tickets are its
+ * gaps. Status, owner (assignee), due date, areas (sub-tasks) and gate come from Jira; the file's
+ * entry adds packages, match, mrs, extra tickets, note and a fallback forecast. File entries
+ * without `jira` stay as file-only rows.
+ */
+async function jiraPlan(program) {
+  const cfg = program.jira ?? {};
+  const overlay = program.families ?? [];
+  const byKey = new Map(overlay.filter((f) => f.jira).map((f) => [f.jira, f]));
+  const re = regexOf(cfg.families);
+  const linkType = cfg.blockLink ?? 'Blocks';
+  const extra = [...byKey.values()].flatMap((o) => o.tickets ?? []);
+  const issues = await familyIssues([...new Set([...byKey.keys(), ...extra])]);
+  const issueByKey = new Map(issues.map((i) => [i.key, i]));
+
+  const rowOf = (issue) => {
+    const f = issue.fields ?? {};
+    const o = byKey.get(issue.key) ?? {};
+    // Open tickets that block the family ticket or any ticket the file lists for it.
+    const linked = [issue, ...(o.tickets ?? []).map((t) => issueByKey.get(t)).filter(Boolean)];
+    const blockerMap = new Map();
+    for (const t of linked) {
+      for (const l of t.fields?.issuelinks ?? []) {
+        const b = l.type?.name === linkType ? l.inwardIssue : null;
+        if (b && b.key !== issue.key && !isDone(b)) blockerMap.set(b.key, b);
+      }
+    }
+    const blockers = [...blockerMap.values()];
+    const subtasks = f.subtasks ?? [];
+    return {
+      ...o,
+      id: issue.key,
+      key: issue.key,
+      url: jiraUrl(issue.key),
+      name: o.name ?? familyName(f.summary),
+      summary: f.summary ?? null,
+      status: f.status?.name ?? null,
+      done: isDone(issue),
+      owner: f.assignee?.displayName ?? 'unassigned',
+      forecast: f.duedate ?? o.forecast ?? null,
+      forecastFrom: f.duedate ? 'jira' : o.forecast ? 'file' : null,
+      tickets: [issue.key, ...subtasks.map((t) => t.key), ...(o.tickets ?? [])],
+      areas: subtasks.length ? { open: subtasks.filter((t) => !isDone(t)).length, total: subtasks.length } : null,
+      gate: blockers.length ? 'gated' : 'ready',
+      gateNote: blockers.length ? `Blocked by ${blockers.map((b) => b.key).join(', ')}` : null,
+      blockers: blockers.map((b) => ({ key: b.key, url: jiraUrl(b.key), summary: b.fields?.summary ?? null })),
+    };
+  };
+
+  const rows = [];
+  const used = new Set();
+  for (const o of overlay) {
+    if (!o.jira) {
+      rows.push({ ...o, fileOnly: true });
+      continue;
+    }
+    const issue = issueByKey.get(o.jira);
+    if (!issue) continue;
+    rows.push(rowOf(issue));
+    used.add(issue.key);
+  }
+  const claimed = new Set(overlay.flatMap((o) => o.tickets ?? []));
+  for (const issue of issues) {
+    if (used.has(issue.key) || claimed.has(issue.key) || isDone(issue)) continue;
+    if (!re?.test(issue.fields?.summary ?? '')) continue;
+    rows.push(rowOf(issue));
+  }
+
+  // One gap row per blocker, naming every family it blocks; the file's `gaps` add files and a note.
+  const gapNotes = new Map((program.gaps ?? []).map((g) => [g.key, g]));
+  const gaps = new Map();
+  for (const r of rows) {
+    if (r.done) continue;
+    for (const b of r.blockers ?? []) {
+      const g = gaps.get(b.key) ?? { ...gapNotes.get(b.key), key: b.key, families: [] };
+      g.families.push(r.name);
+      gaps.set(b.key, g);
+    }
+  }
+  const gapList = [...gaps.values()].map(({ families, ...g }) => ({ ...g, family: families.join(', ') }));
+  return { families: rows, gaps: gapList, jiraFamilies: rows.filter((r) => r.key).length };
 }
 
 const GAP_TTL_MS = 15 * 60 * 1000;
@@ -116,11 +243,23 @@ async function gapStates(gaps) {
 export async function buildProgram(cards, pace) {
   const program = loadProgram();
   if (!program) return { enabled: false, file: PROGRAM_FILE || null };
-  const families = program.families ?? [];
+  let plan = { families: program.families ?? [], gaps: program.gaps ?? [], jiraFamilies: null };
+  let jiraError = null;
+  if (program.jira) {
+    try {
+      plan = await jiraPlan(program);
+    } catch (err) {
+      // Jira down: fall back to the file's own rows so the tab still shows counts.
+      console.error('[program] Jira families:', err.message);
+      jiraError = String(err.message ?? err);
+      plan = { families: (program.families ?? []).map((f) => ({ ...f, id: f.jira ?? f.id })), gaps: [], jiraFamilies: null };
+    }
+  }
+  const families = plan.families;
   const [files, monthAgo, gaps] = await Promise.all([
     pace?.enabled ? headFiles().catch(() => null) : null,
     pace?.enabled ? filesWeeksAgo(4).catch(() => null) : null,
-    gapStates(program.gaps ?? []).catch((err) => {
+    gapStates(plan.gaps).catch((err) => {
       console.error('[program] gap tickets:', err.message);
       return new Map();
     }),
@@ -178,7 +317,7 @@ export async function buildProgram(cards, pace) {
     });
   }
 
-  const gapRows = (program.gaps ?? []).map((g) => ({
+  const gapRows = plan.gaps.map((g) => ({
     ...g,
     url: g.key ? jiraUrl(g.key) : null,
     jira: gaps.get(g.key) ?? null,
@@ -189,6 +328,9 @@ export async function buildProgram(cards, pace) {
     file: PROGRAM_FILE,
     title: program.title ?? null,
     updated: program.updated ?? null,
+    source: program.jira ? 'jira' : 'file',
+    jiraFamilies: plan.jiraFamilies,
+    jiraError,
     families: rows,
     gaps: gapRows,
     reminders: activeReminders(program, Object.fromEntries(cards.map((c) => [c.key, c]))),

@@ -22,12 +22,15 @@ const MrRef = ({ card }) =>
     </a>
   ) : null;
 
-const GapQueue = ({ gaps, idleDays }) => (
+const GapQueue = ({ gaps, idleDays, fromJira }) => (
   <section className="program-section">
     <h2>Gap queue</h2>
     <p className="program-help">
-      Gaps that gate families, most files first. A gap an agent can take meets all four
-      hand-off conditions: open sprint, To Do, assigned to you, ai-ready plus a repo label.
+      {fromJira
+        ? 'Open tickets that block a family in Jira, most files first. '
+        : 'Gaps that gate families, most files first. '}
+      A gap an agent can take meets all four hand-off conditions: open sprint, To Do, assigned to
+      you, ai-ready plus a repo label.
     </p>
     <table className="program-table">
       <thead>
@@ -109,6 +112,21 @@ const Families = ({ families, cardByKey }) => (
               <span className="program-family" title={(f.packages ?? []).join(', ')}>
                 {f.name}
               </span>
+              {f.key && (
+                <span className="program-jira">
+                  {' '}
+                  <a href={f.url} target="_blank" rel="noreferrer" title={f.summary ?? undefined}>
+                    {f.key}
+                  </a>
+                  {f.status && <span className="program-status"> · {f.status}</span>}
+                  {f.areas && (
+                    <span className="program-status">
+                      {' '}
+                      · {f.areas.open} of {f.areas.total} areas open
+                    </span>
+                  )}
+                </span>
+              )}
               {f.serial && (
                 <span className="chip chip--warn program-flag" title="Ungated, files left, at most one MR open">
                   serial
@@ -132,7 +150,12 @@ const Families = ({ families, cardByKey }) => (
             <td className="num">{f.mergedMrs.length || ''}</td>
             <td>{f.owner ?? ''}</td>
             <td>
-              {md(f.forecast)}
+              <span
+                className={f.forecastFrom === 'file' ? 'program-forecast--file' : undefined}
+                title={f.forecastFrom === 'file' ? 'From the plan file: no due date in Jira' : undefined}
+              >
+                {md(f.forecast)}
+              </span>
               {f.withLane && f.withLane !== f.forecast && (
                 <span className="program-lane-date" title="With the faster review lane">
                   {' '}
@@ -148,7 +171,21 @@ const Families = ({ families, cardByKey }) => (
               ) : f.gate ? (
                 <span className="chip chip--good">ready</span>
               ) : null}
-              {f.gate === 'gated' && f.gateNote && <div className="program-note">{f.gateNote}</div>}
+              {f.gate === 'gated' && f.blockers?.length > 0 ? (
+                <div className="program-note">
+                  by{' '}
+                  {f.blockers.map((b, i) => (
+                    <span key={b.key}>
+                      {i > 0 && ', '}
+                      <a href={b.url ?? undefined} target="_blank" rel="noreferrer" title={b.summary ?? undefined}>
+                        {b.key}
+                      </a>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                f.gate === 'gated' && f.gateNote && <div className="program-note">{f.gateNote}</div>
+              )}
             </td>
           </tr>
         ))}
@@ -190,10 +227,16 @@ const ProgramPanel = ({ cardByKey }) => {
       <header className="program-header">
         <h1>{data.title ?? 'Program'}</h1>
         <span className="program-meta">
+          {data.source === 'jira' && data.jiraFamilies != null && `${data.jiraFamilies} families from Jira · `}
           plan file updated {data.updated ?? '?'} · <code>{data.file}</code>
         </span>
       </header>
-      <GapQueue gaps={data.gaps} idleDays={data.gapIdleDays} />
+      {data.jiraError && (
+        <div className="program-note program-late">
+          Jira unavailable ({data.jiraError}); showing the plan file's rows without gaps.
+        </div>
+      )}
+      <GapQueue gaps={data.gaps} idleDays={data.gapIdleDays} fromJira={data.source === 'jira'} />
       <Families families={data.families} cardByKey={cardByKey} />
     </div>
   );

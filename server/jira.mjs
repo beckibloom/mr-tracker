@@ -203,7 +203,8 @@ const EPIC_JQL_LABELS = (process.env.FOCUSED_EPIC_JQL_LABELS ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
-function epicMembersJql() {
+export function epicMembersJql() {
+  if (!EPIC_KEY) return null;
   const labels = EPIC_JQL_LABELS.map((l) => `"${l.replace(/"/g, '')}"`).join(', ');
   return labels ? `parent = ${EPIC_KEY} OR labels in (${labels})` : `parent = ${EPIC_KEY}`;
 }
@@ -217,6 +218,24 @@ export async function getIssues(keys, fields) {
   url.searchParams.set('maxResults', '100');
   const data = await jiraGet(url);
   return data.issues ?? [];
+}
+
+/** Every issue matching `jql` (all pages) with the given fields; [] without credentials. */
+export async function searchIssues(jql, fields) {
+  if (!hasJiraWrite() || !jql) return [];
+  const issues = [];
+  let pageToken = '';
+  do {
+    const url = new URL(`${JIRA_BASE}/rest/api/3/search/jql`);
+    url.searchParams.set('jql', jql);
+    url.searchParams.set('fields', fields.join(','));
+    url.searchParams.set('maxResults', '100');
+    if (pageToken) url.searchParams.set('nextPageToken', pageToken);
+    const data = await jiraGet(url);
+    issues.push(...(data.issues ?? []));
+    pageToken = data.nextPageToken ?? '';
+  } while (pageToken);
+  return issues;
 }
 
 /** The subset of `keys` that sit in an open sprint. */
