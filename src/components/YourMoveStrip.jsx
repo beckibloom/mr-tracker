@@ -69,9 +69,10 @@ const ReminderRow = ({ reminder, next = false, searchSet = null }) => (
   </li>
 );
 
-// A green ref: nothing left but to merge it (server/classify.mjs mergeReady).
-const refClass = (card) => `copy-ref yourmove-ref${card.mergeReady ? ' yourmove-ref--merge-ready' : ''}`;
-const refTitle = (card, title) => (card.mergeReady ? `Ready to merge. ${title}` : title);
+// The ref's colour: yellow for unaddressed feedback, blue for a Chromatic review, green when
+// only the merge is left (server/classify.mjs refChip).
+const refClass = (card) => `copy-ref yourmove-ref${card.refChip ? ` yourmove-ref--${card.refChip.status}` : ''}`;
+const refTitle = (card, title) => (card.refChip ? `${card.refChip.why}. ${title}` : title);
 
 const Row = ({ card, onReveal, extra, reason, onLaunchSkill, searchSet = null }) => (
   <li

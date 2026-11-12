@@ -136,6 +136,48 @@ export function mergeReady(card) {
   return !status || MERGE_STATUS_OK.has(status) || (Boolean(review) && status === 'not_approved');
 }
 
+/**
+ * Feedback on the MR that nobody has addressed yet, as short phrases, empty when there is none:
+ * the agent review of the head (issues, recommendations, a verdict short of approve), our own
+ * review (a saved review of the head asking for changes, or comments posted with no push or reply
+ * since), and people's threads (unresolved, or a reviewer's "request changes"). An agent review of
+ * an older commit doesn't count: the push may have addressed it, and a new review is on its way.
+ */
+export function unaddressedFeedback(card) {
+  const out = [];
+  const r = card.agentReview ?? {};
+  if (r.reviewed && r.onHead) {
+    if (r.issueCount > 0) out.push(`agent: ${plural(r.issueCount, 'issue')}`);
+    if (r.recommendationCount > 0) out.push(`agent: ${plural(r.recommendationCount, 'recommendation')}`);
+    if (!r.issueCount && !r.recommendationCount && r.verdict && !r.verdict.startsWith('APPROVE')) {
+      out.push(`agent: ${r.verdict.toLowerCase()}`);
+    }
+  }
+  const review = card.yourReview;
+  if (review?.noteVerdict === 'request-changes') out.push('our review asks for changes');
+  else if (review?.feedbackAt) out.push('our comments wait on the author');
+  if (card.unresolvedHumanThreads > 0) out.push(plural(card.unresolvedHumanThreads, 'unresolved thread'));
+  if (card.mergeStatus === 'requested_changes') out.push('a reviewer requested changes');
+  else if (card.mergeStatus === 'discussions_not_resolved' && !(card.unresolvedHumanThreads > 0)) {
+    out.push('unresolved threads');
+  }
+  return out;
+}
+
+/**
+ * The ref chip's colour in Your move, first match wins: `feedback` (yellow) while any feedback
+ * is unaddressed, `chromatic` (blue) while a Chromatic check waits for a person, `ready` (green)
+ * when only the merge is left (mergeReady), otherwise none. `why` is the chip's tooltip.
+ */
+export function refChip(card) {
+  if (card.state !== 'opened') return null;
+  const feedback = unaddressedFeedback(card);
+  if (feedback.length > 0) return { status: 'feedback', why: `Unaddressed feedback: ${feedback.join(', ')}` };
+  if (card.chromatic) return { status: 'chromatic', why: `Chromatic review needed: ${card.chromatic.checks.map((c) => c.name).join(', ')}` };
+  if (mergeReady(card)) return { status: 'ready', why: 'Ready to merge' };
+  return null;
+}
+
 export function whoseTurn(card, column = card.autoColumn) {
   const you = (turnReason) => ({ turn: 'you', turnReason, agentReason: null, waitReason: null });
   const wait = (turn, waitReason) => ({ turn, turnReason: null, agentReason: null, waitReason });

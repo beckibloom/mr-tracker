@@ -122,20 +122,22 @@ prompt ready; press Enter).
 Click a ref to scroll to its card, unfolding it if needed; the title opens the MR. With nothing
 to do the strip says "Nothing waiting on you".
 
-A **green ref** means the MR is ready to merge and only the merge (on a review author's MR,
-approve and merge) is left (`mergeReady` in `server/classify.mjs`). It counts only MRs you merge,
-your own and review authors', and needs all of:
+Each MR's ref is coloured by where it stands (`refChip` in `server/classify.mjs`), first match
+wins; hover it for the reasons:
 
-- open, not Draft, and not already in the merge train
-- pipeline passed (warnings allowed), with no Chromatic check waiting
-- agent review clean on the head commit: approve, no issues, no recommendations
-- no merge conflicts and no open blocker
-- approved: on your own MR, GitLab's approval rules met; on a review author's MR, our saved
-  review of the head says approve (or you approved), plus another approver when it needs a
-  second human
-- GitLab's merge status agrees (`mergeable`, or still checking), which adds resolved threads
-  and no "request changes"; on a review author's MR `not_approved` is fine, since the missing
-  approval is yours
+- **Yellow:** feedback nobody has addressed yet. That is the agent review of the head commit
+  (issues, recommendations, or a verdict short of approve), our own review (a saved review of the
+  head asking for changes, or comments posted with no push or reply since), or people's threads
+  (unresolved, or a reviewer's "request changes"). An agent review of an older commit doesn't
+  count: the push may have addressed it.
+- **Blue:** a Chromatic check waits for a person.
+- **Green:** ready to merge, with only the merge left (on a review author's MR, approve and
+  merge). It counts only MRs you merge, your own and review authors', and needs all of: open,
+  not Draft and not in the train; pipeline passed (warnings allowed); agent review clean on the
+  head; no conflicts or open blocker; approved (on your own MR, GitLab's approval rules met; on
+  a review author's MR, our saved review of the head says approve or you approved, plus another
+  approver when it needs a second human); and GitLab's merge status `mergeable` or still
+  checking (`not_approved` is fine on a review author's MR, since the missing approval is yours).
 
 Each card shows its turn as a small label next to its ref. **Dim others** in the top bar fades
 every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`

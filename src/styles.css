@@ -1782,18 +1782,47 @@ button.card-note-text {
   cursor: pointer;
 }
 
-/* Ready to merge: the one chip colour to scan Your move for */
-.yourmove-ref--merge-ready {
-  color: var(--gl-green-500);
-  background: var(--gl-green-100);
-  border-color: var(--gl-green-500);
+/* Ref status in Your move: green ready to merge, yellow unaddressed feedback, blue Chromatic */
+.yourmove-ref--ready,
+.yourmove-ref--feedback,
+.yourmove-ref--chromatic {
   font-weight: 600;
 }
 
-:root[data-theme='dark'] .yourmove-ref--merge-ready {
+.yourmove-ref--ready {
+  color: var(--gl-green-500);
+  background: var(--gl-green-100);
+  border-color: var(--gl-green-500);
+}
+
+.yourmove-ref--feedback {
+  color: var(--gl-orange-500);
+  background: var(--gl-orange-100);
+  border-color: var(--gl-orange-500);
+}
+
+.yourmove-ref--chromatic {
+  color: var(--gl-blue-500);
+  background: var(--gl-blue-50);
+  border-color: var(--gl-blue-500);
+}
+
+:root[data-theme='dark'] .yourmove-ref--ready {
   color: var(--gl-green-300);
   background: color-mix(in srgb, var(--gl-green-300) 18%, transparent);
   border-color: var(--gl-green-300);
+}
+
+:root[data-theme='dark'] .yourmove-ref--feedback {
+  color: var(--gl-orange-300);
+  background: color-mix(in srgb, var(--gl-orange-300) 18%, transparent);
+  border-color: var(--gl-orange-300);
+}
+
+:root[data-theme='dark'] .yourmove-ref--chromatic {
+  color: var(--gl-blue-300);
+  background: color-mix(in srgb, var(--gl-blue-300) 18%, transparent);
+  border-color: var(--gl-blue-300);
 }
 
 .yourmove-title {
