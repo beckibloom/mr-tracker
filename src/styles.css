@@ -2188,6 +2188,13 @@ a.review-note:hover {
   color: var(--gl-red-500);
 }
 
+/* Marks the item the hovered × will delete. */
+.todo-item:has(.todo-delete:hover, .todo-delete:focus-visible) .todo-text {
+  background: color-mix(in srgb, var(--gl-red-500) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gl-red-500) 18%, transparent);
+  border-radius: 2px;
+}
+
 .todo-form {
   display: flex;
   gap: 0.5rem;
