@@ -69,6 +69,10 @@ const ReminderRow = ({ reminder, next = false, searchSet = null }) => (
   </li>
 );
 
+// A green ref: nothing left but to merge it (server/classify.mjs mergeReady).
+const refClass = (card) => `copy-ref yourmove-ref${card.mergeReady ? ' yourmove-ref--merge-ready' : ''}`;
+const refTitle = (card, title) => (card.mergeReady ? `Ready to merge. ${title}` : title);
+
 const Row = ({ card, onReveal, extra, reason, onLaunchSkill, searchSet = null }) => (
   <li
     data-card-key={card.key}
@@ -77,15 +81,15 @@ const Row = ({ card, onReveal, extra, reason, onLaunchSkill, searchSet = null })
     }${searchClass(searchSet, card.key)}`}
   >
     {card.column === 'review' ? (
-      <span className="copy-ref yourmove-ref" title="In the Your review tray">
+      <span className={refClass(card)} title={refTitle(card, 'In the Your review tray')}>
         {shortRef(card)}
       </span>
     ) : (
       <button
         type="button"
-        className="copy-ref yourmove-ref"
+        className={refClass(card)}
         onClick={() => onReveal(card.key)}
-        title="Show on the board"
+        title={refTitle(card, 'Show on the board')}
       >
         {shortRef(card)}
       </button>

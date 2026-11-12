@@ -122,6 +122,21 @@ prompt ready; press Enter).
 Click a ref to scroll to its card, unfolding it if needed; the title opens the MR. With nothing
 to do the strip says "Nothing waiting on you".
 
+A **green ref** means the MR is ready to merge and only the merge (on a review author's MR,
+approve and merge) is left (`mergeReady` in `server/classify.mjs`). It counts only MRs you merge,
+your own and review authors', and needs all of:
+
+- open, not Draft, and not already in the merge train
+- pipeline passed (warnings allowed), with no Chromatic check waiting
+- agent review clean on the head commit: approve, no issues, no recommendations
+- no merge conflicts and no open blocker
+- approved: on your own MR, GitLab's approval rules met; on a review author's MR, our saved
+  review of the head says approve (or you approved), plus another approver when it needs a
+  second human
+- GitLab's merge status agrees (`mergeable`, or still checking), which adds resolved threads
+  and no "request changes"; on a review author's MR `not_approved` is fine, since the missing
+  approval is yours
+
 Each card shows its turn as a small label next to its ref. **Dim others** in the top bar fades
 every card whose turn isn't yours; click it again to turn dimming off. `MRT_HIDE=yourmove`
 hides the strip, the labels and the toggle.

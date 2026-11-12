@@ -1782,6 +1782,20 @@ button.card-note-text {
   cursor: pointer;
 }
 
+/* Ready to merge: the one chip colour to scan Your move for */
+.yourmove-ref--merge-ready {
+  color: var(--gl-green-500);
+  background: var(--gl-green-100);
+  border-color: var(--gl-green-500);
+  font-weight: 600;
+}
+
+:root[data-theme='dark'] .yourmove-ref--merge-ready {
+  color: var(--gl-green-300);
+  background: color-mix(in srgb, var(--gl-green-300) 18%, transparent);
+  border-color: var(--gl-green-300);
+}
+
 .yourmove-title {
   min-width: 0;
   overflow: hidden;

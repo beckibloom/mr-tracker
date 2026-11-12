@@ -101,6 +101,41 @@ const CHROMATIC_ACTIONS = {
 export const chromaticStep = (chromatic) =>
   `in Chromatic, ${chromatic.checks.map((c) => CHROMATIC_ACTIONS[c.name] ?? `clear ${c.name}`).join(' and ')}`;
 
+// GitLab merge statuses that don't stop a merge: mergeable now, or still being worked out after
+// main moved (the other checks below stand in until GitLab settles).
+const MERGE_STATUS_OK = new Set(['mergeable', 'checking', 'unchecked', 'approvals_syncing', 'preparing']);
+
+/**
+ * Ready to merge, for the green ref chip in Your move: the only thing left is to merge it (on a
+ * review author's MR, approve and merge). Only MRs you merge count: your own and review
+ * authors'; anyone else merges their own.
+ *
+ * All of: open, not Draft, not already in the train · pipeline passed (warnings allowed) and no
+ * Chromatic check waiting · agent review clean on the head commit · no conflicts or open
+ * blockers · approved: on your own MR, GitLab's approval rules met; on a review author's MR, our
+ * saved review of the head says approve (or you already approved), plus another approver when
+ * the MR needs a second human · and GitLab itself would merge it, which adds resolved threads
+ * and no "request changes". On a review author's MR, GitLab's `not_approved` is fine: the
+ * missing approval is yours.
+ */
+export function mergeReady(card) {
+  if (card.state !== 'opened' || card.draft || card.inMergeTrain) return false;
+  const review = card.yourReview;
+  if (review && !review.byReviewAuthor) return false;
+  const pipelinePassed = card.pipeline?.color === 'green' || card.pipeline?.color === 'yellow';
+  if (!pipelinePassed || card.chromatic) return false;
+  if (!card.agentReview?.clean) return false;
+  if (card.hasConflicts || (card.openBlockers?.length ?? 0) > 0) return false;
+  if (review) {
+    if (review.noteVerdict !== 'approve' && !review.approved && !card.approvalsMet) return false;
+    if (card.lane?.secondHuman && !review.othersApproved) return false;
+  } else if (!card.approvalsMet) {
+    return false;
+  }
+  const status = card.mergeStatus;
+  return !status || MERGE_STATUS_OK.has(status) || (Boolean(review) && status === 'not_approved');
+}
+
 export function whoseTurn(card, column = card.autoColumn) {
   const you = (turnReason) => ({ turn: 'you', turnReason, agentReason: null, waitReason: null });
   const wait = (turn, waitReason) => ({ turn, turnReason: null, agentReason: null, waitReason });

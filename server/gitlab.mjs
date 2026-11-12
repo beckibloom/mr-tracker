@@ -536,6 +536,10 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
     feedbackAt,
     headSha: sha.slice(0, 8),
     approved: approvedOnHead,
+    // Someone besides you and the author approved: the second human a path or risk rule asks for.
+    othersApproved: (approvals.approved_by ?? []).some(
+      (a) => a.user?.username && a.user.username !== username && a.user.username !== author,
+    ),
     // You approved an earlier head, or a push reset your approval.
     approvalReset:
       !approvedOnHead &&
@@ -763,6 +767,8 @@ export async function fetchOpenCards({ reviewTray = false } = {}) {
             ? approvals.approvals_left === 0
             : (approvals.approved_by?.length ?? 0) > 0,
         hasConflicts: Boolean(detail.has_conflicts) || detail.detailed_merge_status === 'conflict',
+        // GitLab's own verdict on merging now: 'mergeable', 'not_approved', 'discussions_not_resolved'…
+        mergeStatus: detail.detailed_merge_status ?? null,
         reapprovalFrom: resetApprovers(discussions, approvals.approved_by),
         // GitLab "Merge request dependencies": MRs that must merge before this one.
         gitlabBlockers: blocks

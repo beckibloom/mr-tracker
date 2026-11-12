@@ -17,7 +17,7 @@ import {
   projectDir,
   sessionStatus,
 } from './claude.mjs';
-import { classify, COLUMNS, whoseTurn } from './classify.mjs';
+import { classify, COLUMNS, mergeReady, whoseTurn } from './classify.mjs';
 import {
   assertToken,
   fetchMergedCards,
@@ -350,6 +350,7 @@ app.get('/api/board', (_req, res) => {
       ...card,
       column,
       ...withHandoff(card, whoseTurn(card, column), session),
+      mergeReady: mergeReady(card),
       columnSince: state.since[card.key]?.column === column ? state.since[card.key].at : null,
       overridden: Boolean(state.overrides[card.key]),
       note: state.notes[card.key] ?? '',
