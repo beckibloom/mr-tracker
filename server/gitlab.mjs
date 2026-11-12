@@ -536,10 +536,12 @@ function yourReviewState({ mr, detail, approvals, discussions, username, reviewN
     feedbackAt,
     headSha: sha.slice(0, 8),
     approved: approvedOnHead,
-    // Someone besides you and the author approved: the second human a path or risk rule asks for.
-    othersApproved: (approvals.approved_by ?? []).some(
-      (a) => a.user?.username && a.user.username !== username && a.user.username !== author,
-    ),
+    // A person besides you and the author approved (bots don't count): the second human a path
+    // or risk rule asks for.
+    othersApproved: (approvals.approved_by ?? []).some((a) => {
+      const who = a.user?.username;
+      return Boolean(who) && who !== username && who !== author && !isBot(who);
+    }),
     // You approved an earlier head, or a push reset your approval.
     approvalReset:
       !approvedOnHead &&
@@ -592,6 +594,20 @@ function countUnresolvedHumanThreads(discussions, authorUsername) {
     const username = starter.author?.username ?? '';
     return !resolved && !isBot(username) && username !== authorUsername;
   }).length;
+}
+
+/**
+ * Who started each unresolved thread from a person other than the given users (the author and
+ * you), one entry per thread: the threads only a person can answer, not an agent.
+ */
+function unresolvedThreadStarters(discussions, exclude) {
+  return discussions.flatMap((d) => {
+    const starter = (d.notes ?? [])[0];
+    if (!starter?.resolvable) return [];
+    if ((d.notes ?? []).every((n) => !n.resolvable || n.resolved)) return [];
+    const username = starter.author?.username ?? '';
+    return !username || isBot(username) || exclude.includes(username) ? [] : [username];
+  });
 }
 
 /** Maps a pipeline to a card health color: red | yellow | green | running | none. */
@@ -761,6 +777,7 @@ export async function fetchOpenCards({ reviewTray = false } = {}) {
         pipeline: chromatic && pipeline.color === 'running' ? { ...pipeline, status: 'waiting on Chromatic' } : pipeline,
         agentReview: parseAgentReview(discussions, detail.sha ?? mr.sha),
         unresolvedHumanThreads: countUnresolvedHumanThreads(discussions, mr.author?.username),
+        otherThreadStarters: unresolvedThreadStarters(discussions, [mr.author?.username, username]),
         reviewerCount: (detail.reviewers ?? []).filter((r) => !isBot(r.username ?? '')).length,
         approvalsMet:
           required > 0

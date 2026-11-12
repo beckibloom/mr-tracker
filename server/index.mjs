@@ -350,7 +350,7 @@ app.get('/api/board', (_req, res) => {
       ...card,
       column,
       ...withHandoff(card, whoseTurn(card, column), session),
-      refChip: refChip(card),
+      refChip: refChip(card, state.important[card.key]),
       columnSince: state.since[card.key]?.column === column ? state.since[card.key].at : null,
       overridden: Boolean(state.overrides[card.key]),
       note: state.notes[card.key] ?? '',

@@ -69,8 +69,8 @@ const ReminderRow = ({ reminder, next = false, searchSet = null }) => (
   </li>
 );
 
-// The ref's colour: yellow for unaddressed feedback, blue for a Chromatic review, green when
-// only the merge is left (server/classify.mjs refChip).
+// The ref's colour: red for a step only you can take, yellow for unaddressed feedback, blue for
+// a Chromatic review, green when only the merge is left (server/classify.mjs refChip).
 const refClass = (card) => `copy-ref yourmove-ref${card.refChip ? ` yourmove-ref--${card.refChip.status}` : ''}`;
 const refTitle = (card, title) => (card.refChip ? `${card.refChip.why}. ${title}` : title);
 

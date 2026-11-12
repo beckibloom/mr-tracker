@@ -106,6 +106,22 @@ export const chromaticStep = (chromatic) =>
 const MERGE_STATUS_OK = new Set(['mergeable', 'checking', 'unchecked', 'approvals_syncing', 'preparing']);
 
 /**
+ * Our saved review of the head says approve on a review author's MR: it already weighed the
+ * agent review's recommendations, so they no longer count as feedback. Issues still do.
+ */
+const reviewWeighedRecommendations = (card) =>
+  Boolean(card.yourReview?.byReviewAuthor && card.yourReview.noteVerdict === 'approve');
+
+/** The agent review of the head is clean, or only has recommendations our approve weighed. */
+function agentReviewClean(card) {
+  const r = card.agentReview;
+  if (r?.clean) return true;
+  return Boolean(
+    reviewWeighedRecommendations(card) && r?.onHead && r.issueCount === 0 && r.verdict?.startsWith('APPROVE'),
+  );
+}
+
+/**
  * Ready to merge, for the green ref chip in Your move: the only thing left is to merge it (on a
  * review author's MR, approve and merge). Only MRs you merge count: your own and review
  * authors'; anyone else merges their own.
@@ -124,7 +140,7 @@ export function mergeReady(card) {
   if (review && !review.byReviewAuthor) return false;
   const pipelinePassed = card.pipeline?.color === 'green' || card.pipeline?.color === 'yellow';
   if (!pipelinePassed || card.chromatic) return false;
-  if (!card.agentReview?.clean) return false;
+  if (!agentReviewClean(card)) return false;
   if (card.hasConflicts || (card.openBlockers?.length ?? 0) > 0) return false;
   if (review) {
     if (review.noteVerdict !== 'approve' && !review.approved && !card.approvalsMet) return false;
@@ -148,7 +164,9 @@ export function unaddressedFeedback(card) {
   const r = card.agentReview ?? {};
   if (r.reviewed && r.onHead) {
     if (r.issueCount > 0) out.push(`agent: ${plural(r.issueCount, 'issue')}`);
-    if (r.recommendationCount > 0) out.push(`agent: ${plural(r.recommendationCount, 'recommendation')}`);
+    if (r.recommendationCount > 0 && !reviewWeighedRecommendations(card)) {
+      out.push(`agent: ${plural(r.recommendationCount, 'recommendation')}`);
+    }
     if (!r.issueCount && !r.recommendationCount && r.verdict && !r.verdict.startsWith('APPROVE')) {
       out.push(`agent: ${r.verdict.toLowerCase()}`);
     }
@@ -165,12 +183,38 @@ export function unaddressedFeedback(card) {
 }
 
 /**
- * The ref chip's colour in Your move, first match wins: `feedback` (yellow) while any feedback
- * is unaddressed, `chromatic` (blue) while a Chromatic check waits for a person, `ready` (green)
- * when only the merge is left (mergeReady), otherwise none. `why` is the chip's tooltip.
+ * Steps only you can take, short of merging, as short phrases, empty when there are none: a
+ * thread someone besides you and the author started on an MR you merge (an agent can't answer
+ * for you), someone else's MR waiting on your review, an approval to re-ask for, and a step an
+ * agent flagged ‼ with a reason (`important`, the server's flag for this card).
  */
-export function refChip(card) {
+export function yourAsks(card, important = null) {
+  const out = [];
+  const review = card.yourReview;
+  const youMerge = !review || review.byReviewAuthor;
+  const starters = youMerge ? (card.otherThreadStarters ?? []) : [];
+  if (starters.length > 0) {
+    const who = [...new Set(starters)].map((u) => `@${u}`).join(', ');
+    out.push(`answer ${plural(starters.length, 'thread')} from ${who}`);
+  }
+  if (review?.needsYou && !review.byReviewAuthor) out.push(`review @${review.author}'s MR`);
+  if (!card.approvalsMet && card.reapprovalFrom?.length > 0) {
+    out.push(`ask ${card.reapprovalFrom.map((u) => `@${u}`).join(', ')} to re-approve`);
+  }
+  if (important?.reason && !mergeReady(card)) out.push(important.reason);
+  return out;
+}
+
+/**
+ * The ref chip's colour in Your move, first match wins: `yours` (red) while a step only you can
+ * take waits (yourAsks), `feedback` (yellow) while feedback an agent can address is unaddressed,
+ * `chromatic` (blue) while a Chromatic check waits for a person, `ready` (green) when only the
+ * merge is left (mergeReady), otherwise none. `why` is the chip's tooltip.
+ */
+export function refChip(card, important = null) {
   if (card.state !== 'opened') return null;
+  const asks = yourAsks(card, important);
+  if (asks.length > 0) return { status: 'yours', why: `Yours: ${asks.join('; ')}` };
   const feedback = unaddressedFeedback(card);
   if (feedback.length > 0) return { status: 'feedback', why: `Unaddressed feedback: ${feedback.join(', ')}` };
   if (card.chromatic) return { status: 'chromatic', why: `Chromatic review needed: ${card.chromatic.checks.map((c) => c.name).join(', ')}` };
